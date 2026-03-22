@@ -363,6 +363,76 @@ public class GeolocalizacionService {
     }
 
     // ============================
+    // 🤖 RASTREO AUTOMÁTICO EN TIEMPO REAL
+    // ============================
+
+    /**
+     * Envía solicitudes de ubicación automáticas a todos los empleados EN TURNO
+     * (que marcaron entrada pero no han marcado salida).
+     * 
+     * Este método es llamado por el scheduler cada 1 minuto para monitoreo en
+     * tiempo real.
+     * 
+     * @return número de solicitudes enviadas exitosamente
+     */
+    @Transactional
+    public int enviarSolicitudesAutomaticas() {
+        logger.info("🤖 Iniciando rastreo automático en tiempo real...");
+
+        // Obtener todos los registros activos (empleados en turno)
+        List<com.practica.backend.entity.Registro> registrosEnTurno = registroRepository.findAllRegistrosEnTurno();
+
+        if (registrosEnTurno.isEmpty()) {
+            logger.info("📍 No hay empleados en turno actualmente");
+            return 0;
+        }
+
+        // Obtener el primer admin del sistema para asignar las solicitudes automáticas
+        List<Usuario> admins = usuarioRepository.findByRolOrderByIdAsc("ADMIN");
+        if (admins.isEmpty()) {
+            logger.warn("⚠️ No hay administradores en el sistema para asignar solicitudes automáticas");
+            return 0;
+        }
+        Usuario adminSistema = admins.get(0);
+
+        int solicitudesEnviadas = 0;
+
+        for (com.practica.backend.entity.Registro registro : registrosEnTurno) {
+            Usuario empleado = registro.getUsuario();
+
+            // No enviar solicitudes a usuarios con rol ADMIN
+            if ("ADMIN".equals(empleado.getRol())) {
+                continue;
+            }
+
+            try {
+                // Crear la solicitud automática
+                SolicitudUbicacion solicitud = new SolicitudUbicacion(adminSistema, empleado);
+                solicitud.setEsAutomatica(true);
+                solicitud = solicitudRepository.save(solicitud);
+
+                // Enviar notificación silenciosa al empleado
+                boolean enviada = enviarNotificacionSilenciosa(empleado, solicitud.getId());
+
+                if (enviada) {
+                    solicitudesEnviadas++;
+                    logger.info("🤖 Solicitud automática #{} enviada a: {}", solicitud.getId(), empleado.getNombre());
+                } else {
+                    logger.warn("⚠️ No se pudo enviar notificación automática a: {} (sin dispositivos)",
+                            empleado.getNombre());
+                }
+            } catch (Exception e) {
+                logger.error("❌ Error al enviar solicitud automática a {}: {}", empleado.getNombre(), e.getMessage());
+            }
+        }
+
+        logger.info("🤖 Rastreo automático completado: {} solicitudes enviadas de {} empleados en turno",
+                solicitudesEnviadas, registrosEnTurno.size());
+
+        return solicitudesEnviadas;
+    }
+
+    // ============================
     // 🗑️ LIMPIEZA Y ELIMINACIÓN
     // ============================
 

@@ -42,6 +42,10 @@ public class SolicitudUbicacion {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // 🤖 Indica si la solicitud fue generada automáticamente por el sistema
+    @Column(name = "es_automatica", columnDefinition = "boolean default false")
+    private Boolean esAutomatica = false;
+
     // Zona horaria de Colombia
     private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
 
@@ -159,5 +163,13 @@ public class SolicitudUbicacion {
 
     public void setMensajeError(String mensajeError) {
         this.mensajeError = mensajeError;
+    }
+
+    public Boolean getEsAutomatica() {
+        return esAutomatica;
+    }
+
+    public void setEsAutomatica(Boolean esAutomatica) {
+        this.esAutomatica = esAutomatica;
     }
 }

@@ -80,4 +80,9 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
         // 📅 OBTENER EL MES MÁS ANTIGUO CON REGISTROS
         @Query("SELECT MIN(r.fecha) FROM Registro r")
         LocalDate findFechaMasAntigua();
+
+        // 📍 OBTENER TODOS LOS REGISTROS EN TURNO (empleados con entrada pero sin
+        // salida)
+        @Query("SELECT r FROM Registro r WHERE r.horaSalida IS NULL ORDER BY r.fecha DESC, r.horaEntrada DESC")
+        List<Registro> findAllRegistrosEnTurno();
 }

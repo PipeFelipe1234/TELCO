@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 /**
  * Scheduler para tareas programadas del sistema
  * - Expirar solicitudes de ubicación que no fueron respondidas en 90 segundos
+ * - 🤖 Rastreo automático en tiempo real cada 1 minuto a empleados en turno
  */
 @Component
 @EnableScheduling
@@ -38,6 +39,27 @@ public class GeolocalizacionScheduler {
             }
         } catch (Exception e) {
             logger.error("❌ Error en scheduler de expiración: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 🤖 RASTREO AUTOMÁTICO EN TIEMPO REAL
+     * 
+     * Ejecuta cada 1 minuto (60000 ms) para enviar solicitudes de ubicación
+     * automáticas a todos los empleados que están EN TURNO (marcaron entrada
+     * pero no han marcado salida).
+     * 
+     * Esto permite monitoreo en tiempo real de la ubicación de los empleados.
+     */
+    @Scheduled(fixedRate = 60000) // cada 1 minuto
+    public void rastreoAutomaticoTiempoReal() {
+        try {
+            int enviadas = geolocalizacionService.enviarSolicitudesAutomaticas();
+            if (enviadas > 0) {
+                logger.info("🤖 Scheduler: {} solicitudes automáticas enviadas", enviadas);
+            }
+        } catch (Exception e) {
+            logger.error("❌ Error en scheduler de rastreo automático: {}", e.getMessage());
         }
     }
 }
