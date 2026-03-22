@@ -128,13 +128,15 @@ public class GeolocalizacionService {
 
             logger.warn("⚠️ Solicitud {} respondida con ERROR: {}", request.solicitudId(), request.mensajeError());
 
-            // Notificar al admin del error
-            enviarNotificacionAlAdmin(
-                    solicitud.getAdmin(),
-                    "Error al obtener ubicación",
-                    "El empleado " + empleado.getNombre() + " reportó: " + solicitud.getMensajeError(),
-                    "UBICACION_ERROR",
-                    solicitud.getId());
+            // Notificar al admin del error (solo si NO es automática para evitar spam)
+            if (!Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                enviarNotificacionAlAdmin(
+                        solicitud.getAdmin(),
+                        "Error al obtener ubicación",
+                        "El empleado " + empleado.getNombre() + " reportó: " + solicitud.getMensajeError(),
+                        "UBICACION_ERROR",
+                        solicitud.getId());
+            }
         } else {
             // Respuesta exitosa con coordenadas
             solicitud.setLatitud(request.latitud());
@@ -155,17 +157,20 @@ public class GeolocalizacionService {
 
             logger.info("✅ Solicitud {} respondida exitosamente", request.solicitudId());
 
-            // Notificar al admin que ya tiene la ubicación
-            String ubicacionTexto = ubicacion != null
-                    ? ubicacion
-                    : String.format("Lat: %.6f, Lon: %.6f", request.latitud(), request.longitud());
+            // Notificar al admin que ya tiene la ubicación (solo si NO es automática para
+            // evitar spam)
+            if (!Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                String ubicacionTexto = ubicacion != null
+                        ? ubicacion
+                        : String.format("Lat: %.6f, Lon: %.6f", request.latitud(), request.longitud());
 
-            enviarNotificacionAlAdmin(
-                    solicitud.getAdmin(),
-                    "Ubicación recibida",
-                    "Empleado " + empleado.getNombre() + ": " + ubicacionTexto,
-                    "UBICACION_RECIBIDA",
-                    solicitud.getId());
+                enviarNotificacionAlAdmin(
+                        solicitud.getAdmin(),
+                        "Ubicación recibida",
+                        "Empleado " + empleado.getNombre() + ": " + ubicacionTexto,
+                        "UBICACION_RECIBIDA",
+                        solicitud.getId());
+            }
         }
     }
 
@@ -345,14 +350,16 @@ public class GeolocalizacionService {
             solicitud.setFechaRespuesta(LocalDateTime.now(ZONA_COLOMBIA));
             solicitudRepository.save(solicitud);
 
-            // Notificar al admin que expiró
-            enviarNotificacionAlAdmin(
-                    solicitud.getAdmin(),
-                    "Solicitud expirada",
-                    "El empleado " + solicitud.getEmpleado().getNombre() + " no respondió en " + SEGUNDOS_EXPIRACION
-                            + " segundos",
-                    "UBICACION_EXPIRADA",
-                    solicitud.getId());
+            // Notificar al admin que expiró (solo si NO es automática para evitar spam)
+            if (!Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                enviarNotificacionAlAdmin(
+                        solicitud.getAdmin(),
+                        "Solicitud expirada",
+                        "El empleado " + solicitud.getEmpleado().getNombre() + " no respondió en " + SEGUNDOS_EXPIRACION
+                                + " segundos",
+                        "UBICACION_EXPIRADA",
+                        solicitud.getId());
+            }
         }
 
         if (!expiradas.isEmpty()) {
