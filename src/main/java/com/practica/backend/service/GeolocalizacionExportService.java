@@ -97,20 +97,22 @@ public class GeolocalizacionExportService {
 
     /**
      * Obtiene las solicitudes filtradas según los criterios.
+     * IMPORTANTE: Solo retorna solicitudes MANUALES (excluye automáticas).
      * Si se especifica 'mes', filtra por ese mes (y año si se especifica, sino año
      * actual).
      * Si no se especifica 'mes', usa los filtros de fechaInicio/fechaFin.
      */
     private List<SolicitudUbicacion> obtenerSolicitudesFiltradas(GeolocalizacionExportRequest filtros) {
-        // Si se especifica mes, usar el repositorio directo para filtrar por mes
+        // Si se especifica mes, usar el repositorio directo para filtrar por mes (SOLO
+        // MANUALES)
         if (filtros != null && filtros.mes() != null) {
             int mes = filtros.mes();
             int anio = filtros.anio() != null ? filtros.anio() : LocalDate.now().getYear();
-            return solicitudRepository.findByMesYAnio(mes, anio);
+            return solicitudRepository.findManualesByMesYAnio(mes, anio);
         }
 
-        // Si no hay filtro de mes, obtener todas y filtrar en memoria
-        List<SolicitudUbicacion> todas = solicitudRepository.findAllByOrderByFechaSolicitudDesc();
+        // Si no hay filtro de mes, obtener SOLO MANUALES y filtrar en memoria
+        List<SolicitudUbicacion> todas = solicitudRepository.findAllManualesOrderByFechaSolicitudDesc();
 
         return todas.stream()
                 // Filtrar por rango de fechas
@@ -178,10 +180,10 @@ public class GeolocalizacionExportService {
     }
 
     /**
-     * Exporta por mes y año a PDF
+     * Exporta por mes y año a PDF (SOLO MANUALES)
      */
     public byte[] exportarPdfPorMes(int mes, int anio) throws Exception {
-        List<SolicitudUbicacion> solicitudes = solicitudRepository.findByMesYAnio(mes, anio);
+        List<SolicitudUbicacion> solicitudes = solicitudRepository.findManualesByMesYAnio(mes, anio);
         return generarPdf(solicitudes, "Geolocalizaciones - " + getNombreMes(mes) + " " + anio);
     }
 
@@ -316,10 +318,10 @@ public class GeolocalizacionExportService {
     }
 
     /**
-     * Exporta por mes y año a Excel
+     * Exporta por mes y año a Excel (SOLO MANUALES)
      */
     public byte[] exportarExcelPorMes(int mes, int anio) throws Exception {
-        List<SolicitudUbicacion> solicitudes = solicitudRepository.findByMesYAnio(mes, anio);
+        List<SolicitudUbicacion> solicitudes = solicitudRepository.findManualesByMesYAnio(mes, anio);
         return generarExcel(solicitudes, "Geolocalizaciones - " + getNombreMes(mes) + " " + anio);
     }
 
@@ -461,17 +463,18 @@ public class GeolocalizacionExportService {
     }
 
     // ============================
-    // 📅 MESES DISPONIBLES
+    // 📅 MESES DISPONIBLES (SOLO MANUALES)
     // ============================
 
     /**
-     * Obtiene los meses que tienen geolocalizaciones para exportar
+     * Obtiene los meses que tienen geolocalizaciones MANUALES para exportar
+     * (excluye automáticas)
      */
     public List<Map<String, Object>> obtenerMesesDisponibles() {
         List<Map<String, Object>> meses = new ArrayList<>();
 
-        LocalDateTime fechaMasAntigua = solicitudRepository.findFechaMasAntigua();
-        LocalDateTime fechaMasReciente = solicitudRepository.findFechaMasReciente();
+        LocalDateTime fechaMasAntigua = solicitudRepository.findFechaMasAntiguaManuales();
+        LocalDateTime fechaMasReciente = solicitudRepository.findFechaMasRecienteManuales();
 
         if (fechaMasAntigua == null || fechaMasReciente == null) {
             return meses;
@@ -483,7 +486,7 @@ public class GeolocalizacionExportService {
         while (!inicio.isAfter(fin)) {
             int mes = inicio.getMonthValue();
             int anio = inicio.getYear();
-            long cantidad = solicitudRepository.countByMesYAnio(mes, anio);
+            long cantidad = solicitudRepository.countManualesByMesYAnio(mes, anio);
 
             if (cantidad > 0) {
                 meses.add(Map.of(

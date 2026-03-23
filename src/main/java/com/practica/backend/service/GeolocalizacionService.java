@@ -458,6 +458,7 @@ public class GeolocalizacionService {
 
     /**
      * Obtiene información sobre la próxima limpieza automática de geolocalizaciones
+     * Muestra solo las MANUALES que se perderán (las exportables)
      */
     public java.util.Map<String, Object> obtenerInfoLimpieza() {
         java.time.LocalDate hoy = java.time.LocalDate.now();
@@ -470,10 +471,10 @@ public class GeolocalizacionService {
         int mes = mesAEliminar.getMonthValue();
         int anio = mesAEliminar.getYear();
 
-        // Contar geolocalizaciones que serán eliminadas
-        long cantidad = solicitudRepository.countByMesYAnio(mes, anio);
+        // Contar solo geolocalizaciones MANUALES que serán eliminadas (las exportables)
+        long cantidad = solicitudRepository.countManualesByMesYAnio(mes, anio);
 
-        // Si no hay geolocalizaciones del mes antiguo, no hay advertencia
+        // Si no hay geolocalizaciones manuales del mes antiguo, no hay advertencia
         if (cantidad == 0) {
             return java.util.Map.of(
                     "hayAdvertencia", false,

@@ -34,13 +34,24 @@ public interface SolicitudUbicacionRepository extends JpaRepository<SolicitudUbi
     List<SolicitudUbicacion> findSolicitudesPendientesByEmpleado(@Param("empleado") Usuario empleado);
 
     // ============================
-    // 📊 HISTORIAL Y FILTROS
+    // 📊 HISTORIAL Y FILTROS (SOLO MANUALES - excluye automáticas)
     // ============================
 
-    // Obtener todas las solicitudes ordenadas por fecha descendente
+    // Obtener todas las solicitudes MANUALES ordenadas por fecha descendente
+    @Query("SELECT s FROM SolicitudUbicacion s WHERE (s.esAutomatica IS NULL OR s.esAutomatica = false) ORDER BY s.fechaSolicitud DESC")
+    List<SolicitudUbicacion> findAllManualesOrderByFechaSolicitudDesc();
+
+    // Obtener todas las solicitudes ordenadas por fecha descendente (legacy -
+    // incluye todas)
     List<SolicitudUbicacion> findAllByOrderByFechaSolicitudDesc();
 
-    // Obtener solicitudes por rango de fechas
+    // Obtener solicitudes MANUALES por rango de fechas
+    @Query("SELECT s FROM SolicitudUbicacion s WHERE (s.esAutomatica IS NULL OR s.esAutomatica = false) AND DATE(s.fechaSolicitud) >= :fechaInicio AND DATE(s.fechaSolicitud) <= :fechaFin ORDER BY s.fechaSolicitud DESC")
+    List<SolicitudUbicacion> findManualesByFechaRange(
+            @Param("fechaInicio") LocalDate fechaInicio,
+            @Param("fechaFin") LocalDate fechaFin);
+
+    // Obtener solicitudes por rango de fechas (legacy - incluye todas)
     @Query("SELECT s FROM SolicitudUbicacion s WHERE DATE(s.fechaSolicitud) >= :fechaInicio AND DATE(s.fechaSolicitud) <= :fechaFin ORDER BY s.fechaSolicitud DESC")
     List<SolicitudUbicacion> findByFechaRange(
             @Param("fechaInicio") LocalDate fechaInicio,
@@ -49,7 +60,11 @@ public interface SolicitudUbicacionRepository extends JpaRepository<SolicitudUbi
     // Obtener solicitudes de un empleado específico
     List<SolicitudUbicacion> findByEmpleadoOrderByFechaSolicitudDesc(Usuario empleado);
 
-    // Obtener solicitudes por mes y año
+    // Obtener solicitudes MANUALES por mes y año (para historial y exportación)
+    @Query("SELECT s FROM SolicitudUbicacion s WHERE (s.esAutomatica IS NULL OR s.esAutomatica = false) AND MONTH(s.fechaSolicitud) = :mes AND YEAR(s.fechaSolicitud) = :anio ORDER BY s.fechaSolicitud DESC")
+    List<SolicitudUbicacion> findManualesByMesYAnio(@Param("mes") int mes, @Param("anio") int anio);
+
+    // Obtener solicitudes por mes y año (legacy - incluye todas)
     @Query("SELECT s FROM SolicitudUbicacion s WHERE MONTH(s.fechaSolicitud) = :mes AND YEAR(s.fechaSolicitud) = :anio ORDER BY s.fechaSolicitud DESC")
     List<SolicitudUbicacion> findByMesYAnio(@Param("mes") int mes, @Param("anio") int anio);
 
@@ -57,7 +72,12 @@ public interface SolicitudUbicacionRepository extends JpaRepository<SolicitudUbi
     // 🗑️ LIMPIEZA AUTOMÁTICA
     // ============================
 
-    // Contar solicitudes de un mes y año específico
+    // Contar solicitudes MANUALES de un mes y año específico (para advertencias de
+    // limpieza)
+    @Query("SELECT COUNT(s) FROM SolicitudUbicacion s WHERE (s.esAutomatica IS NULL OR s.esAutomatica = false) AND MONTH(s.fechaSolicitud) = :mes AND YEAR(s.fechaSolicitud) = :anio")
+    long countManualesByMesYAnio(@Param("mes") int mes, @Param("anio") int anio);
+
+    // Contar solicitudes de un mes y año específico (todas - incluye automáticas)
     @Query("SELECT COUNT(s) FROM SolicitudUbicacion s WHERE MONTH(s.fechaSolicitud) = :mes AND YEAR(s.fechaSolicitud) = :anio")
     long countByMesYAnio(@Param("mes") int mes, @Param("anio") int anio);
 
@@ -68,14 +88,22 @@ public interface SolicitudUbicacionRepository extends JpaRepository<SolicitudUbi
     int deleteByMesYAnio(@Param("mes") int mes, @Param("anio") int anio);
 
     // ============================
-    // 📅 MESES DISPONIBLES
+    // 📅 MESES DISPONIBLES (SOLO MANUALES para historial)
     // ============================
 
-    // Obtener el mes más antiguo con solicitudes
+    // Obtener el mes más antiguo con solicitudes MANUALES
+    @Query("SELECT MIN(s.fechaSolicitud) FROM SolicitudUbicacion s WHERE (s.esAutomatica IS NULL OR s.esAutomatica = false)")
+    LocalDateTime findFechaMasAntiguaManuales();
+
+    // Obtener el mes más reciente con solicitudes MANUALES
+    @Query("SELECT MAX(s.fechaSolicitud) FROM SolicitudUbicacion s WHERE (s.esAutomatica IS NULL OR s.esAutomatica = false)")
+    LocalDateTime findFechaMasRecienteManuales();
+
+    // Obtener el mes más antiguo con solicitudes (todas - legacy)
     @Query("SELECT MIN(s.fechaSolicitud) FROM SolicitudUbicacion s")
     LocalDateTime findFechaMasAntigua();
 
-    // Obtener el mes más reciente con solicitudes
+    // Obtener el mes más reciente con solicitudes (todas - legacy)
     @Query("SELECT MAX(s.fechaSolicitud) FROM SolicitudUbicacion s")
     LocalDateTime findFechaMasReciente();
 }
