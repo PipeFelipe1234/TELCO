@@ -40,18 +40,21 @@ public class GeolocalizacionService {
     private final TokenDispositivoRepository tokenDispositivoRepository;
     private final RegistroRepository registroRepository;
     private final GeocodingService geocodingService;
+    private final RastreoZonaService rastreoZonaService;
 
     public GeolocalizacionService(
             SolicitudUbicacionRepository solicitudRepository,
             UsuarioRepository usuarioRepository,
             TokenDispositivoRepository tokenDispositivoRepository,
             RegistroRepository registroRepository,
-            GeocodingService geocodingService) {
+            GeocodingService geocodingService,
+            RastreoZonaService rastreoZonaService) {
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
         this.tokenDispositivoRepository = tokenDispositivoRepository;
         this.registroRepository = registroRepository;
         this.geocodingService = geocodingService;
+        this.rastreoZonaService = rastreoZonaService;
     }
 
     /**
@@ -156,6 +159,15 @@ public class GeolocalizacionService {
             solicitudRepository.save(solicitud);
 
             logger.info("✅ Solicitud {} respondida exitosamente", request.solicitudId());
+
+            // 📍 Si es solicitud automática, procesar rastreo de zona
+            if (Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                try {
+                    rastreoZonaService.procesarUbicacion(empleado, request.latitud(), request.longitud());
+                } catch (Exception e) {
+                    logger.error("❌ Error al procesar rastreo de zona: {}", e.getMessage());
+                }
+            }
 
             // Notificar al admin que ya tiene la ubicación (solo si NO es automática para
             // evitar spam)

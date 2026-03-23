@@ -29,6 +29,18 @@ public class SecurityConfig {
                         // USUARIOS AUTENTICADOS
                         .requestMatchers(HttpMethod.PUT, "/api/usuarios/**").authenticated()
 
+                        // ZONAS - Lectura para todos los autenticados
+                        .requestMatchers(HttpMethod.GET, "/api/zonas").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/zonas/{id}").authenticated()
+
+                        // ZONAS - Administración solo para ADMIN
+                        .requestMatchers(HttpMethod.GET, "/api/zonas/todas").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/zonas/rastreo/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/zonas/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/zonas/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/zonas/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/zonas/**").hasRole("ADMIN")
+
                         // ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
