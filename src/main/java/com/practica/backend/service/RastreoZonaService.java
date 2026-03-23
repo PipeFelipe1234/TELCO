@@ -196,13 +196,15 @@ public class RastreoZonaService {
     // ============================
 
     /**
-     * Obtiene el estado de rastreo de todos los empleados
+     * Obtiene el estado de rastreo de todos los empleados.
+     * Si el empleado ya no tiene zona activa (marcó salida), los minutos son 0.
      */
     public List<RastreoZonaResponse> obtenerTodosLosRastreos() {
         return rastreoRepository.findAllOrderByEstado().stream()
                 .map(r -> {
                     int minutos = 0;
-                    if (r.getTimestampEntradaZona() != null) {
+                    // Solo calcular minutos si hay zona activa y timestamp de entrada
+                    if (r.getZonaActual() != null && r.getTimestampEntradaZona() != null) {
                         minutos = (int) ChronoUnit.MINUTES.between(
                                 r.getTimestampEntradaZona(),
                                 LocalDateTime.now(ZONA_COLOMBIA));
@@ -219,7 +221,8 @@ public class RastreoZonaService {
         return rastreoRepository.findByEstadoPreocupante().stream()
                 .map(r -> {
                     int minutos = 0;
-                    if (r.getTimestampEntradaZona() != null) {
+                    // Solo calcular minutos si hay zona activa y timestamp de entrada
+                    if (r.getZonaActual() != null && r.getTimestampEntradaZona() != null) {
                         minutos = (int) ChronoUnit.MINUTES.between(
                                 r.getTimestampEntradaZona(),
                                 LocalDateTime.now(ZONA_COLOMBIA));
@@ -237,7 +240,8 @@ public class RastreoZonaService {
                 .orElseThrow(() -> new RuntimeException("No hay rastreo para el empleado con ID: " + empleadoId));
 
         int minutos = 0;
-        if (rastreo.getTimestampEntradaZona() != null) {
+        // Solo calcular minutos si hay zona activa y timestamp de entrada
+        if (rastreo.getZonaActual() != null && rastreo.getTimestampEntradaZona() != null) {
             minutos = (int) ChronoUnit.MINUTES.between(
                     rastreo.getTimestampEntradaZona(),
                     LocalDateTime.now(ZONA_COLOMBIA));
