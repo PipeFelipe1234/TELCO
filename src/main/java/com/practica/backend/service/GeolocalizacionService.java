@@ -396,15 +396,15 @@ public class GeolocalizacionService {
      */
     @Transactional
     public int enviarSolicitudesAutomaticas() {
-        logger.info("🤖 Iniciando rastreo automático en tiempo real...");
-
         // Obtener todos los registros activos (empleados en turno)
         List<com.practica.backend.entity.Registro> registrosEnTurno = registroRepository.findAllRegistrosEnTurno();
 
+        // Si no hay empleados en turno, salir silenciosamente (sin logs innecesarios)
         if (registrosEnTurno.isEmpty()) {
-            logger.info("📍 No hay empleados en turno actualmente");
             return 0;
         }
+
+        logger.info("🤖 Iniciando rastreo automático: {} empleados en turno", registrosEnTurno.size());
 
         // Obtener el primer admin del sistema para asignar las solicitudes automáticas
         List<Usuario> admins = usuarioRepository.findByRolOrderByIdAsc("ADMIN");

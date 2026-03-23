@@ -50,11 +50,14 @@ public class GeolocalizacionScheduler {
      * pero no han marcado salida).
      * 
      * Esto permite monitoreo en tiempo real de la ubicación de los empleados.
+     * 
+     * No genera logs si no hay empleados en turno (para evitar spam en logs).
      */
     @Scheduled(fixedRate = 60000) // cada 1 minuto
     public void rastreoAutomaticoTiempoReal() {
         try {
             int enviadas = geolocalizacionService.enviarSolicitudesAutomaticas();
+            // Solo loguear si hubo solicitudes enviadas
             if (enviadas > 0) {
                 logger.info("🤖 Scheduler: {} solicitudes automáticas enviadas", enviadas);
             }

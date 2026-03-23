@@ -47,11 +47,16 @@ public class JwtFilter extends OncePerRequestFilter {
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (ExpiredJwtException e) {
-                System.out.println("Token expirado: " + e.getMessage());
+                System.out.println("⛔ Token expirado para request: " + request.getRequestURI());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"error\": \"Token expirado\"}");
+                return; // No continuar el filtro si el token está expirado
             } catch (JwtException e) {
-                System.out.println("Token JWT inválido: " + e.getMessage());
+                System.out.println(
+                        "⛔ Token JWT inválido: " + e.getMessage() + " para request: " + request.getRequestURI());
             } catch (Exception e) {
-                System.out.println("Error procesando token: " + e.getMessage());
+                System.out.println(
+                        "⛔ Error procesando token: " + e.getMessage() + " para request: " + request.getRequestURI());
             }
         }
 

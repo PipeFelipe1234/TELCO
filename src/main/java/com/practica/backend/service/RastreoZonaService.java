@@ -251,17 +251,15 @@ public class RastreoZonaService {
     }
 
     /**
-     * Reinicia el rastreo de un empleado (cuando marca salida)
+     * Elimina el rastreo de un empleado (cuando marca salida).
+     * El registro se elimina completamente de la BD para que no aparezca en el
+     * array de rastreos.
      */
     @Transactional
-    public void reiniciarRastreo(Usuario empleado) {
+    public void eliminarRastreo(Usuario empleado) {
         rastreoRepository.findByEmpleado(empleado).ifPresent(rastreo -> {
-            rastreo.setZonaActual(null);
-            rastreo.setTimestampEntradaZona(null);
-            rastreo.setEstadoTiempo(EstadoTiempo.BIEN);
-            rastreo.setNotificacionPreocupanteEnviada(false);
-            rastreoRepository.save(rastreo);
-            logger.info("🔄 Rastreo reiniciado para {}", empleado.getNombre());
+            rastreoRepository.delete(rastreo);
+            logger.info("🗑️ Rastreo eliminado para {} (marcó salida)", empleado.getNombre());
         });
     }
 }

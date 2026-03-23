@@ -146,9 +146,9 @@ public class RegistroService {
 
         Registro guardado = registroRepository.save(registro);
 
-        // � REINICIAR RASTREO DE ZONA (el empleado ya no está en turno)
+        // 🗑️ ELIMINAR RASTREO DE ZONA (el empleado ya no está en turno)
         try {
-            rastreoZonaService.reiniciarRastreo(usuario);
+            rastreoZonaService.eliminarRastreo(usuario);
         } catch (Exception e) {
             // No fallar si hay error en el rastreo
             // El log ya se registra en RastreoZonaService
