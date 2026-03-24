@@ -24,13 +24,15 @@ public class RegistroService {
     private final RegistroRepository registroRepository;
     private final NotificacionService notificacionService;
     private final GeocodingService geocodingService;
+    private final RastreoZonaService rastreoZonaService;
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
 
     public RegistroService(RegistroRepository registroRepository, NotificacionService notificacionService,
-            GeocodingService geocodingService) {
+            GeocodingService geocodingService, RastreoZonaService rastreoZonaService) {
         this.registroRepository = registroRepository;
         this.notificacionService = notificacionService;
         this.geocodingService = geocodingService;
+        this.rastreoZonaService = rastreoZonaService;
     }
 
     /**
@@ -144,7 +146,15 @@ public class RegistroService {
 
         Registro guardado = registroRepository.save(registro);
 
-        // 📲 ENVIAR NOTIFICACIÓN A LOS ADMINS
+        // 🗑️ ELIMINAR RASTREO DE ZONA (el empleado ya no está en turno)
+        try {
+            rastreoZonaService.eliminarRastreo(usuario);
+        } catch (Exception e) {
+            // No fallar si hay error en el rastreo
+            // El log ya se registra en RastreoZonaService
+        }
+
+        // �📲 ENVIAR NOTIFICACIÓN A LOS ADMINS
         enviarNotificacionSalida(guardado);
 
         return mapToResponse(guardado);

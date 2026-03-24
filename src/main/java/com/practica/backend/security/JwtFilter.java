@@ -23,17 +23,23 @@ public class JwtFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
 
         String authHeader = request.getHeader("Authorization");
+        String requestURI = request.getRequestURI();
+        String method = request.getMethod();
+
+        // Log detallado para endpoints de salida
+        if (requestURI.contains("salida")) {
+            System.out.println("🔍 [JwtFilter] " + method + " " + requestURI);
+            System.out.println("🔍 [JwtFilter] Auth header present: " + (authHeader != null));
+        }
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
 
             try {
-                // Validar que el token no esté expirado primero
                 String identificacion = JwtUtil.extraerIdentificacion(token);
                 String rol = JwtUtil.extraerRol(token);
 
                 if (identificacion != null) {
-                    // Crear lista de autoridades
                     List<SimpleGrantedAuthority> autoridades = new ArrayList<>();
                     if (rol != null && !rol.isEmpty()) {
                         autoridades.add(new SimpleGrantedAuthority("ROLE_" + rol));
@@ -45,14 +51,22 @@ public class JwtFilter extends OncePerRequestFilter {
                             autoridades);
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                    if (requestURI.contains("salida")) {
+                        System.out.println("✅ [JwtFilter] Usuario autenticado: " + identificacion + " con rol: " + rol);
+                    }
+                } else {
+                    System.out.println("⚠️ [JwtFilter] Token sin identificación para: " + requestURI);
                 }
             } catch (ExpiredJwtException e) {
-                System.out.println("Token expirado: " + e.getMessage());
+                System.out.println("⛔ [JwtFilter] Token EXPIRADO para: " + requestURI);
             } catch (JwtException e) {
-                System.out.println("Token JWT inválido: " + e.getMessage());
+                System.out.println("⛔ [JwtFilter] Token inválido: " + e.getMessage() + " para: " + requestURI);
             } catch (Exception e) {
-                System.out.println("Error procesando token: " + e.getMessage());
+                System.out.println("⛔ [JwtFilter] Error: " + e.getMessage() + " para: " + requestURI);
             }
+        } else if (requestURI.contains("salida")) {
+            System.out.println("⚠️ [JwtFilter] Sin header Authorization para: " + requestURI);
         }
 
         filterChain.doFilter(request, response);

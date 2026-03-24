@@ -40,18 +40,21 @@ public class GeolocalizacionService {
     private final TokenDispositivoRepository tokenDispositivoRepository;
     private final RegistroRepository registroRepository;
     private final GeocodingService geocodingService;
+    private final RastreoZonaService rastreoZonaService;
 
     public GeolocalizacionService(
             SolicitudUbicacionRepository solicitudRepository,
             UsuarioRepository usuarioRepository,
             TokenDispositivoRepository tokenDispositivoRepository,
             RegistroRepository registroRepository,
-            GeocodingService geocodingService) {
+            GeocodingService geocodingService,
+            RastreoZonaService rastreoZonaService) {
         this.solicitudRepository = solicitudRepository;
         this.usuarioRepository = usuarioRepository;
         this.tokenDispositivoRepository = tokenDispositivoRepository;
         this.registroRepository = registroRepository;
         this.geocodingService = geocodingService;
+        this.rastreoZonaService = rastreoZonaService;
     }
 
     /**
@@ -128,13 +131,15 @@ public class GeolocalizacionService {
 
             logger.warn("⚠️ Solicitud {} respondida con ERROR: {}", request.solicitudId(), request.mensajeError());
 
-            // Notificar al admin del error
-            enviarNotificacionAlAdmin(
-                    solicitud.getAdmin(),
-                    "Error al obtener ubicación",
-                    "El empleado " + empleado.getNombre() + " reportó: " + solicitud.getMensajeError(),
-                    "UBICACION_ERROR",
-                    solicitud.getId());
+            // Notificar al admin del error (solo si NO es automática para evitar spam)
+            if (!Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                enviarNotificacionAlAdmin(
+                        solicitud.getAdmin(),
+                        "Error al obtener ubicación",
+                        "El empleado " + empleado.getNombre() + " reportó: " + solicitud.getMensajeError(),
+                        "UBICACION_ERROR",
+                        solicitud.getId());
+            }
         } else {
             // Respuesta exitosa con coordenadas
             solicitud.setLatitud(request.latitud());
@@ -155,17 +160,29 @@ public class GeolocalizacionService {
 
             logger.info("✅ Solicitud {} respondida exitosamente", request.solicitudId());
 
-            // Notificar al admin que ya tiene la ubicación
-            String ubicacionTexto = ubicacion != null
-                    ? ubicacion
-                    : String.format("Lat: %.6f, Lon: %.6f", request.latitud(), request.longitud());
+            // 📍 Si es solicitud automática, procesar rastreo de zona
+            if (Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                try {
+                    rastreoZonaService.procesarUbicacion(empleado, request.latitud(), request.longitud());
+                } catch (Exception e) {
+                    logger.error("❌ Error al procesar rastreo de zona: {}", e.getMessage());
+                }
+            }
 
-            enviarNotificacionAlAdmin(
-                    solicitud.getAdmin(),
-                    "Ubicación recibida",
-                    "Empleado " + empleado.getNombre() + ": " + ubicacionTexto,
-                    "UBICACION_RECIBIDA",
-                    solicitud.getId());
+            // Notificar al admin que ya tiene la ubicación (solo si NO es automática para
+            // evitar spam)
+            if (!Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                String ubicacionTexto = ubicacion != null
+                        ? ubicacion
+                        : String.format("Lat: %.6f, Lon: %.6f", request.latitud(), request.longitud());
+
+                enviarNotificacionAlAdmin(
+                        solicitud.getAdmin(),
+                        "Ubicación recibida",
+                        "Empleado " + empleado.getNombre() + ": " + ubicacionTexto,
+                        "UBICACION_RECIBIDA",
+                        solicitud.getId());
+            }
         }
     }
 
@@ -345,14 +362,16 @@ public class GeolocalizacionService {
             solicitud.setFechaRespuesta(LocalDateTime.now(ZONA_COLOMBIA));
             solicitudRepository.save(solicitud);
 
-            // Notificar al admin que expiró
-            enviarNotificacionAlAdmin(
-                    solicitud.getAdmin(),
-                    "Solicitud expirada",
-                    "El empleado " + solicitud.getEmpleado().getNombre() + " no respondió en " + SEGUNDOS_EXPIRACION
-                            + " segundos",
-                    "UBICACION_EXPIRADA",
-                    solicitud.getId());
+            // Notificar al admin que expiró (solo si NO es automática para evitar spam)
+            if (!Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                enviarNotificacionAlAdmin(
+                        solicitud.getAdmin(),
+                        "Solicitud expirada",
+                        "El empleado " + solicitud.getEmpleado().getNombre() + " no respondió en " + SEGUNDOS_EXPIRACION
+                                + " segundos",
+                        "UBICACION_EXPIRADA",
+                        solicitud.getId());
+            }
         }
 
         if (!expiradas.isEmpty()) {
@@ -377,15 +396,15 @@ public class GeolocalizacionService {
      */
     @Transactional
     public int enviarSolicitudesAutomaticas() {
-        logger.info("🤖 Iniciando rastreo automático en tiempo real...");
-
         // Obtener todos los registros activos (empleados en turno)
         List<com.practica.backend.entity.Registro> registrosEnTurno = registroRepository.findAllRegistrosEnTurno();
 
+        // Si no hay empleados en turno, salir silenciosamente (sin logs innecesarios)
         if (registrosEnTurno.isEmpty()) {
-            logger.info("📍 No hay empleados en turno actualmente");
             return 0;
         }
+
+        logger.info("🤖 Iniciando rastreo automático: {} empleados en turno", registrosEnTurno.size());
 
         // Obtener el primer admin del sistema para asignar las solicitudes automáticas
         List<Usuario> admins = usuarioRepository.findByRolOrderByIdAsc("ADMIN");
@@ -451,6 +470,7 @@ public class GeolocalizacionService {
 
     /**
      * Obtiene información sobre la próxima limpieza automática de geolocalizaciones
+     * Muestra solo las MANUALES que se perderán (las exportables)
      */
     public java.util.Map<String, Object> obtenerInfoLimpieza() {
         java.time.LocalDate hoy = java.time.LocalDate.now();
@@ -463,10 +483,10 @@ public class GeolocalizacionService {
         int mes = mesAEliminar.getMonthValue();
         int anio = mesAEliminar.getYear();
 
-        // Contar geolocalizaciones que serán eliminadas
-        long cantidad = solicitudRepository.countByMesYAnio(mes, anio);
+        // Contar solo geolocalizaciones MANUALES que serán eliminadas (las exportables)
+        long cantidad = solicitudRepository.countManualesByMesYAnio(mes, anio);
 
-        // Si no hay geolocalizaciones del mes antiguo, no hay advertencia
+        // Si no hay geolocalizaciones manuales del mes antiguo, no hay advertencia
         if (cantidad == 0) {
             return java.util.Map.of(
                     "hayAdvertencia", false,
