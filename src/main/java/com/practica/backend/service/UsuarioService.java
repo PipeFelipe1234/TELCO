@@ -1,20 +1,33 @@
 package com.practica.backend.service;
 
+import com.practica.backend.dto.UsuarioConZonasResponse;
 import com.practica.backend.dto.UsuarioRequest;
 import com.practica.backend.dto.UsuarioResponse;
 import com.practica.backend.dto.UsuarioUpdateRequest;
 import com.practica.backend.entity.Usuario;
+import com.practica.backend.entity.Zona;
 import com.practica.backend.repository.UsuarioRepository;
+import com.practica.backend.repository.ZonaRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class UsuarioService {
 
-        private final UsuarioRepository usuarioRepository;
+        private static final Logger logger = LoggerFactory.getLogger(UsuarioService.class);
 
-        public UsuarioService(UsuarioRepository usuarioRepository) {
+        private final UsuarioRepository usuarioRepository;
+        private final ZonaRepository zonaRepository;
+
+        public UsuarioService(UsuarioRepository usuarioRepository, ZonaRepository zonaRepository) {
                 this.usuarioRepository = usuarioRepository;
+                this.zonaRepository = zonaRepository;
         }
 
         public UsuarioResponse crearUsuario(UsuarioRequest request) {
@@ -198,5 +211,104 @@ public class UsuarioService {
                                 actualizado.getFoto(),
                                 actualizado.getTelefono(),
                                 actualizado.getCargo());
+        }
+
+        // ============================
+        // 📍 GESTIÓN DE ZONAS ASIGNADAS
+        // ============================
+
+        /**
+         * Asigna zonas a un usuario (reemplaza las zonas existentes)
+         */
+        @Transactional
+        public UsuarioConZonasResponse asignarZonas(Long usuarioId, List<Long> zonaIds) {
+                Usuario usuario = usuarioRepository.findById(usuarioId)
+                                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + usuarioId));
+
+                // Obtener las zonas por sus IDs
+                Set<Zona> nuevasZonas = new HashSet<>();
+                for (Long zonaId : zonaIds) {
+                        Zona zona = zonaRepository.findById(zonaId)
+                                        .orElseThrow(() -> new RuntimeException(
+                                                        "Zona no encontrada con ID: " + zonaId));
+                        nuevasZonas.add(zona);
+                }
+
+                // Asignar las nuevas zonas (reemplaza las existentes)
+                usuario.setZonasAsignadas(nuevasZonas);
+                Usuario actualizado = usuarioRepository.save(usuario);
+
+                logger.info("📍 Zonas asignadas al usuario {}: {} zonas", usuario.getNombre(), zonaIds.size());
+
+                return UsuarioConZonasResponse.fromEntity(actualizado);
+        }
+
+        /**
+         * Obtiene un usuario con sus zonas asignadas
+         */
+        @Transactional(readOnly = true)
+        public UsuarioConZonasResponse obtenerUsuarioConZonas(Long usuarioId) {
+                Usuario usuario = usuarioRepository.findById(usuarioId)
+                                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + usuarioId));
+
+                // Forzar carga de zonas (LAZY)
+                usuario.getZonasAsignadas().size();
+
+                return UsuarioConZonasResponse.fromEntity(usuario);
+        }
+
+        /**
+         * Obtiene todos los usuarios con sus zonas asignadas
+         */
+        @Transactional(readOnly = true)
+        public List<UsuarioConZonasResponse> obtenerTodosConZonas() {
+                return usuarioRepository.findAll().stream()
+                                .peek(u -> u.getZonasAsignadas().size()) // Forzar carga LAZY
+                                .map(UsuarioConZonasResponse::fromEntity)
+                                .toList();
+        }
+
+        /**
+         * Agrega zonas a un usuario (sin eliminar las existentes)
+         */
+        @Transactional
+        public UsuarioConZonasResponse agregarZonas(Long usuarioId, List<Long> zonaIds) {
+                Usuario usuario = usuarioRepository.findById(usuarioId)
+                                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + usuarioId));
+
+                // Forzar carga LAZY
+                usuario.getZonasAsignadas().size();
+
+                List<Zona> zonasAAgregar = zonaRepository.findAllById(zonaIds);
+
+                if (zonasAAgregar.size() != zonaIds.size()) {
+                        throw new RuntimeException("Una o más zonas no fueron encontradas");
+                }
+
+                usuario.getZonasAsignadas().addAll(zonasAAgregar);
+                Usuario actualizado = usuarioRepository.save(usuario);
+
+                logger.info("📍 {} zonas agregadas al usuario {}", zonasAAgregar.size(), usuario.getNombre());
+
+                return UsuarioConZonasResponse.fromEntity(actualizado);
+        }
+
+        /**
+         * Elimina una zona de un usuario
+         */
+        @Transactional
+        public UsuarioConZonasResponse quitarZona(Long usuarioId, Long zonaId) {
+                Usuario usuario = usuarioRepository.findById(usuarioId)
+                                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con ID: " + usuarioId));
+
+                // Forzar carga LAZY
+                usuario.getZonasAsignadas().size();
+
+                usuario.getZonasAsignadas().removeIf(z -> z.getId().equals(zonaId));
+                Usuario actualizado = usuarioRepository.save(usuario);
+
+                logger.info("📍 Zona {} removida del usuario {}", zonaId, usuario.getNombre());
+
+                return UsuarioConZonasResponse.fromEntity(actualizado);
         }
 }

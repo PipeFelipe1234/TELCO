@@ -47,7 +47,7 @@ public class RastreoZonaService {
     private static final int UMBRAL_PREOCUPANTE = 10; // Después de 10 min -> PREOCUPANTE
 
     // Radio en metros para considerar que es la misma residencia
-    private static final double RADIO_RESIDENCIA_METROS = 50.0;
+    private static final double RADIO_RESIDENCIA_METROS = 100.0;
 
     private final RastreoZonaRepository rastreoRepository;
     private final ZonaService zonaService;
@@ -69,7 +69,8 @@ public class RastreoZonaService {
      * Procesa una nueva ubicación de un empleado.
      * 
      * Dos niveles de rastreo:
-     * 1. ZONA: Detecta si salió de la zona → envía notificación
+     * 1. ZONA ASIGNADA: Detecta si salió de SUS zonas asignadas → envía
+     * notificación
      * 2. RESIDENCIA: Detecta tiempo en el mismo punto → estados
      * BIEN/NORMAL/PREOCUPANTE
      */
@@ -77,10 +78,16 @@ public class RastreoZonaService {
     public RastreoZonaResponse procesarUbicacion(Usuario empleado, double latitud, double longitud) {
         logger.info("📍 Procesando ubicación de {} en ({}, {})", empleado.getNombre(), latitud, longitud);
 
+        // Cargar el usuario con sus zonas asignadas (evitar problemas de LAZY loading)
+        Usuario empleadoConZonas = usuarioRepository.findById(empleado.getId())
+                .orElse(empleado);
+        // Forzar carga de zonas asignadas
+        empleadoConZonas.getZonasAsignadas().size();
+
         // Buscar o crear el rastreo del empleado
-        RastreoZona rastreo = rastreoRepository.findByEmpleado(empleado)
+        RastreoZona rastreo = rastreoRepository.findByEmpleado(empleadoConZonas)
                 .orElseGet(() -> {
-                    RastreoZona nuevo = new RastreoZona(empleado);
+                    RastreoZona nuevo = new RastreoZona(empleadoConZonas);
                     return rastreoRepository.save(nuevo);
                 });
 
@@ -91,15 +98,14 @@ public class RastreoZonaService {
         LocalDateTime ahora = LocalDateTime.now(ZONA_COLOMBIA);
 
         // ==========================================
-        // 1. RASTREO DE ZONA (detectar si salió)
+        // 1. RASTREO DE ZONA ASIGNADA (detectar si salió de SUS zonas)
         // ==========================================
-        Zona zonaActual = zonaService.encontrarZonaPorPunto(latitud, longitud);
-        procesarRastreoZona(rastreo, zonaActual, empleado, ahora);
+        procesarRastreoZonasAsignadas(rastreo, empleadoConZonas, latitud, longitud, ahora);
 
         // ==========================================
         // 2. RASTREO DE RESIDENCIA (tiempo en punto)
         // ==========================================
-        int minutosEnResidencia = procesarRastreoResidencia(rastreo, latitud, longitud, empleado, ahora);
+        int minutosEnResidencia = procesarRastreoResidencia(rastreo, latitud, longitud, empleadoConZonas, ahora);
 
         rastreo = rastreoRepository.save(rastreo);
 
@@ -107,28 +113,101 @@ public class RastreoZonaService {
     }
 
     /**
-     * Procesa el rastreo de zona: detecta si el empleado salió de su zona
+     * Procesa el rastreo de zonas ASIGNADAS al usuario.
+     * Solo envía notificación si el usuario tiene zonas asignadas y sale de TODAS
+     * ellas.
      */
-    private void procesarRastreoZona(RastreoZona rastreo, Zona zonaActual, Usuario empleado, LocalDateTime ahora) {
+    private void procesarRastreoZonasAsignadas(RastreoZona rastreo, Usuario empleado,
+            double latitud, double longitud, LocalDateTime ahora) {
+        // Verificar si el usuario tiene zonas asignadas
+        if (!empleado.tieneZonasAsignadas()) {
+            // Sin zonas asignadas, no hay nada que rastrear
+            rastreo.setZonaActual(null);
+            rastreo.setTimestampEntradaZona(null);
+            return;
+        }
+
+        // Buscar si está en alguna de SUS zonas asignadas
+        Zona zonaActual = encontrarZonaAsignadaParaEmpleado(empleado, latitud, longitud);
         Zona zonaAnterior = rastreo.getZonaActual();
 
         if (zonaActual == null) {
-            // No está en ninguna zona
+            // No está en NINGUNA de sus zonas asignadas
             if (zonaAnterior != null && !Boolean.TRUE.equals(rastreo.getNotificacionSalioZonaEnviada())) {
-                // Acaba de salir de la zona - enviar notificación
+                // Estaba en una zona asignada y ahora salió - enviar notificación
                 enviarNotificacionSalioDeZona(empleado, zonaAnterior);
+                rastreo.setNotificacionSalioZonaEnviada(true);
+            } else if (zonaAnterior == null && !Boolean.TRUE.equals(rastreo.getNotificacionSalioZonaEnviada())) {
+                // Primera ubicación y ya está fuera de todas sus zonas - notificar
+                logger.warn("⚠️ {} está fuera de todas sus zonas asignadas", empleado.getNombre());
+                enviarNotificacionFueraDeZonasAsignadas(empleado);
                 rastreo.setNotificacionSalioZonaEnviada(true);
             }
             rastreo.setZonaActual(null);
             rastreo.setTimestampEntradaZona(null);
         } else {
-            // Está en una zona
+            // Está en alguna de sus zonas asignadas
             if (zonaAnterior == null || !zonaAnterior.getId().equals(zonaActual.getId())) {
-                // Entró a una nueva zona
-                logger.info("👤 {} entró a la zona {}", empleado.getNombre(), zonaActual.getNombre());
+                // Entró a una de sus zonas asignadas
+                logger.info("👤 {} entró a su zona asignada: {}", empleado.getNombre(), zonaActual.getNombre());
                 rastreo.setZonaActual(zonaActual);
                 rastreo.setTimestampEntradaZona(ahora);
                 rastreo.setNotificacionSalioZonaEnviada(false); // Resetear flag
+            }
+        }
+    }
+
+    /**
+     * Busca si el empleado está en alguna de SUS zonas asignadas
+     */
+    private Zona encontrarZonaAsignadaParaEmpleado(Usuario empleado, double latitud, double longitud) {
+        for (Zona zona : empleado.getZonasAsignadas()) {
+            if (zona.getActiva() && zonaService.estaDentroDeZona(latitud, longitud, zona)) {
+                return zona;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Envía notificación cuando el empleado está fuera de TODAS sus zonas
+     * asignadas.
+     * Mensaje: "El [cargo] [nombre] está fuera de sus zonas asignadas"
+     */
+    private void enviarNotificacionFueraDeZonasAsignadas(Usuario empleado) {
+        String cargo = empleado.getCargo() != null ? empleado.getCargo() : "Empleado";
+        String mensajeBody = "El " + cargo + " " + empleado.getNombre() + " está fuera de sus zonas asignadas";
+
+        logger.warn("🚨 ALERTA: {}", mensajeBody);
+
+        List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
+
+        for (Usuario admin : admins) {
+            List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
+
+            for (TokenDispositivo tokenDispositivo : tokens) {
+                try {
+                    Message message = Message.builder()
+                            .setToken(tokenDispositivo.getToken())
+                            .setNotification(Notification.builder()
+                                    .setTitle("⚠️ Empleado Fuera de Zona")
+                                    .setBody(mensajeBody)
+                                    .build())
+                            .putData("type", "ALERTA_FUERA_ZONAS_ASIGNADAS")
+                            .putData("empleadoId", String.valueOf(empleado.getId()))
+                            .putData("empleadoNombre", empleado.getNombre())
+                            .putData("empleadoCargo", cargo)
+                            .setAndroidConfig(AndroidConfig.builder()
+                                    .setPriority(AndroidConfig.Priority.HIGH)
+                                    .build())
+                            .build();
+
+                    FirebaseMessaging.getInstance().send(message);
+                    logger.info("📱 Notificación 'fuera de zonas asignadas' enviada al admin {}", admin.getNombre());
+
+                } catch (FirebaseMessagingException e) {
+                    logger.error("❌ Error al enviar notificación a {}: {}", admin.getNombre(), e.getMessage());
+                }
             }
         }
     }
@@ -232,10 +311,14 @@ public class RastreoZonaService {
     }
 
     /**
-     * Envía notificación cuando el empleado SALE de la zona
+     * Envía notificación cuando el empleado SALE de la zona.
+     * Mensaje: "El [cargo] [nombre] está fuera de [zona]"
      */
     private void enviarNotificacionSalioDeZona(Usuario empleado, Zona zona) {
-        logger.warn("🚨 ALERTA: {} salió de la zona {}", empleado.getNombre(), zona.getNombre());
+        String cargo = empleado.getCargo() != null ? empleado.getCargo() : "Empleado";
+        String mensajeBody = "El " + cargo + " " + empleado.getNombre() + " está fuera de " + zona.getNombre();
+
+        logger.warn("🚨 ALERTA: {}", mensajeBody);
 
         List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
 
@@ -248,11 +331,12 @@ public class RastreoZonaService {
                             .setToken(tokenDispositivo.getToken())
                             .setNotification(Notification.builder()
                                     .setTitle("⚠️ Empleado Fuera de Zona")
-                                    .setBody("El usuario " + empleado.getNombre() + " salió de su zona.")
+                                    .setBody(mensajeBody)
                                     .build())
                             .putData("type", "ALERTA_SALIO_ZONA")
                             .putData("empleadoId", String.valueOf(empleado.getId()))
                             .putData("empleadoNombre", empleado.getNombre())
+                            .putData("empleadoCargo", cargo)
                             .putData("zonaId", String.valueOf(zona.getId()))
                             .putData("zonaNombre", zona.getNombre())
                             .setAndroidConfig(AndroidConfig.builder()

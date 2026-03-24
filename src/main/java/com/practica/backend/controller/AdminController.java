@@ -1,10 +1,12 @@
 package com.practica.backend.controller;
 
+import com.practica.backend.dto.AsignarZonasRequest;
 import com.practica.backend.dto.ExportRequest;
 import com.practica.backend.dto.GeolocalizacionExportRequest;
 import com.practica.backend.dto.GeolocalizacionHistorialResponse;
 import com.practica.backend.dto.RegistroFilterRequest;
 import com.practica.backend.dto.SolicitudUbicacionResponse;
+import com.practica.backend.dto.UsuarioConZonasResponse;
 import com.practica.backend.dto.UsuarioUpdateRequest;
 import com.practica.backend.entity.Usuario;
 import com.practica.backend.service.ExportService;
@@ -380,5 +382,62 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> obtenerInfoLimpiezaGeolocalizaciones() {
         logger.info("📊 Consultando info de limpieza de geolocalizaciones");
         return ResponseEntity.ok(geolocalizacionService.obtenerInfoLimpieza());
+    }
+
+    // ============================
+    // 📍 ASIGNACIÓN DE ZONAS A USUARIOS
+    // ============================
+
+    /**
+     * Obtiene todos los usuarios con sus zonas asignadas
+     */
+    @GetMapping("/usuarios/con-zonas")
+    public ResponseEntity<List<UsuarioConZonasResponse>> obtenerUsuariosConZonas() {
+        logger.info("📍 Consultando usuarios con sus zonas asignadas");
+        return ResponseEntity.ok(usuarioService.obtenerTodosConZonas());
+    }
+
+    /**
+     * Obtiene un usuario con sus zonas asignadas
+     */
+    @GetMapping("/usuarios/{id}/zonas")
+    public ResponseEntity<UsuarioConZonasResponse> obtenerUsuarioConZonas(@PathVariable Long id) {
+        logger.info("📍 Consultando zonas del usuario ID: {}", id);
+        return ResponseEntity.ok(usuarioService.obtenerUsuarioConZonas(id));
+    }
+
+    /**
+     * Asigna zonas a un usuario (reemplaza las existentes)
+     * Body: {"zonaIds": [1, 2, 3]}
+     */
+    @PutMapping("/usuarios/{id}/zonas")
+    public ResponseEntity<UsuarioConZonasResponse> asignarZonas(
+            @PathVariable Long id,
+            @RequestBody AsignarZonasRequest request) {
+        logger.info("📍 Asignando {} zonas al usuario ID: {}", request.zonaIds().size(), id);
+        return ResponseEntity.ok(usuarioService.asignarZonas(id, request.zonaIds()));
+    }
+
+    /**
+     * Agrega zonas a un usuario (sin eliminar las existentes)
+     * Body: {"zonaIds": [1, 2, 3]}
+     */
+    @PostMapping("/usuarios/{usuarioId}/zonas")
+    public ResponseEntity<UsuarioConZonasResponse> agregarZonas(
+            @PathVariable Long usuarioId,
+            @RequestBody AsignarZonasRequest request) {
+        logger.info("📍 Agregando zonas {} al usuario {}", request.zonaIds(), usuarioId);
+        return ResponseEntity.ok(usuarioService.agregarZonas(usuarioId, request.zonaIds()));
+    }
+
+    /**
+     * Quita una zona de un usuario
+     */
+    @DeleteMapping("/usuarios/{usuarioId}/zonas/{zonaId}")
+    public ResponseEntity<UsuarioConZonasResponse> quitarZona(
+            @PathVariable Long usuarioId,
+            @PathVariable Long zonaId) {
+        logger.info("📍 Quitando zona {} del usuario {}", zonaId, usuarioId);
+        return ResponseEntity.ok(usuarioService.quitarZona(usuarioId, zonaId));
     }
 }
