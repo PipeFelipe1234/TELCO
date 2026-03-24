@@ -5,8 +5,17 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 
 /**
- * Entidad para rastrear el estado de tiempo de un empleado en una zona.
- * Guarda cuándo entró a la zona actual y su estado de tiempo.
+ * Entidad para rastrear el estado de tiempo de un empleado en una zona y
+ * residencia.
+ * - Rastreo de ZONA: detecta si el empleado está dentro o fuera de la zona
+ * asignada
+ * - Rastreo de RESIDENCIA: detecta si el empleado está mucho tiempo en el mismo
+ * punto/residencia
+ * 
+ * Estados de tiempo (para residencia):
+ * - BIEN: 0-3 minutos en la misma residencia
+ * - NORMAL: 3-10 minutos en la misma residencia
+ * - PREOCUPANTE: 10+ minutos en la misma residencia
  */
 @Entity
 @Table(name = "rastreo_zona")
@@ -15,7 +24,7 @@ public class RastreoZona {
     private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
 
     /**
-     * Estados de tiempo en zona:
+     * Estados de tiempo en residencia:
      * - BIEN: 0-3 minutos (verde)
      * - NORMAL: 3-10 minutos (amarillo)
      * - PREOCUPANTE: 10+ minutos (rojo)
@@ -42,13 +51,41 @@ public class RastreoZona {
     private Zona zonaActual;
 
     /**
-     * Timestamp de cuando entró a la zona actual
+     * Timestamp de cuando entró a la zona actual (para detectar si sale)
      */
     @Column(name = "timestamp_entrada_zona")
     private LocalDateTime timestampEntradaZona;
 
+    // ==========================================
+    // CAMPOS PARA RASTREO DE RESIDENCIA/PUNTO
+    // ==========================================
+
     /**
-     * Estado actual de tiempo en la zona
+     * Latitud del punto de residencia actual donde está el empleado
+     */
+    @Column(name = "latitud_residencia")
+    private Double latitudResidencia;
+
+    /**
+     * Longitud del punto de residencia actual donde está el empleado
+     */
+    @Column(name = "longitud_residencia")
+    private Double longitudResidencia;
+
+    /**
+     * Timestamp de cuando llegó a la residencia actual
+     */
+    @Column(name = "timestamp_entrada_residencia")
+    private LocalDateTime timestampEntradaResidencia;
+
+    /**
+     * Indica si ya se envió notificación de "salió de zona"
+     */
+    @Column(name = "notificacion_salio_zona_enviada")
+    private Boolean notificacionSalioZonaEnviada = false;
+
+    /**
+     * Estado actual de tiempo en la RESIDENCIA (no en la zona)
      */
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
@@ -67,7 +104,8 @@ public class RastreoZona {
     private LocalDateTime ultimaActualizacion;
 
     /**
-     * Indica si ya se envió notificación de estado PREOCUPANTE
+     * Indica si ya se envió notificación de estado PREOCUPANTE en la residencia
+     * actual
      * (para no enviar múltiples notificaciones)
      */
     @Column(name = "notificacion_preocupante_enviada")
@@ -158,5 +196,38 @@ public class RastreoZona {
 
     public void setNotificacionPreocupanteEnviada(Boolean notificacionPreocupanteEnviada) {
         this.notificacionPreocupanteEnviada = notificacionPreocupanteEnviada;
+    }
+
+    // Getters y Setters para campos de residencia
+    public Double getLatitudResidencia() {
+        return latitudResidencia;
+    }
+
+    public void setLatitudResidencia(Double latitudResidencia) {
+        this.latitudResidencia = latitudResidencia;
+    }
+
+    public Double getLongitudResidencia() {
+        return longitudResidencia;
+    }
+
+    public void setLongitudResidencia(Double longitudResidencia) {
+        this.longitudResidencia = longitudResidencia;
+    }
+
+    public LocalDateTime getTimestampEntradaResidencia() {
+        return timestampEntradaResidencia;
+    }
+
+    public void setTimestampEntradaResidencia(LocalDateTime timestampEntradaResidencia) {
+        this.timestampEntradaResidencia = timestampEntradaResidencia;
+    }
+
+    public Boolean getNotificacionSalioZonaEnviada() {
+        return notificacionSalioZonaEnviada;
+    }
+
+    public void setNotificacionSalioZonaEnviada(Boolean notificacionSalioZonaEnviada) {
+        this.notificacionSalioZonaEnviada = notificacionSalioZonaEnviada;
     }
 }

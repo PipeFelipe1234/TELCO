@@ -58,14 +58,25 @@ public class RegistroController {
         @PostMapping("/salida")
         public ResponseEntity<RegistroResponse> marcarSalida(
                         @RequestBody MarcarSalidaRequest request) {
-                String identificacion = SecurityContextHolder.getContext()
-                                .getAuthentication()
-                                .getName();
+                logger.info("📤 Iniciando marcarSalida...");
 
-                Usuario usuario = usuarioService.obtenerPorIdentificacion(identificacion);
+                try {
+                        String identificacion = SecurityContextHolder.getContext()
+                                        .getAuthentication()
+                                        .getName();
+                        logger.info("📤 Identificación obtenida: {}", identificacion);
 
-                return ResponseEntity.ok(
-                                registroService.marcarSalida(usuario, request));
+                        Usuario usuario = usuarioService.obtenerPorIdentificacion(identificacion);
+                        logger.info("📤 Usuario encontrado: {}", usuario.getNombre());
+
+                        RegistroResponse response = registroService.marcarSalida(usuario, request);
+                        logger.info("✅ Salida registrada exitosamente para: {}", usuario.getNombre());
+
+                        return ResponseEntity.ok(response);
+                } catch (Exception e) {
+                        logger.error("❌ Error en marcarSalida: {}", e.getMessage(), e);
+                        throw e;
+                }
         }
 
         @GetMapping("/mis-registros")
