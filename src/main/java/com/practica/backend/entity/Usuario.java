@@ -1,6 +1,8 @@
 package com.practica.backend.entity;
 
 import jakarta.persistence.*;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "usuarios")
@@ -30,6 +32,14 @@ public class Usuario {
 
     @Column
     private String cargo;
+
+    /**
+     * Zonas asignadas al usuario.
+     * Un usuario puede tener múltiples zonas donde puede trabajar.
+     */
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "usuario_zonas", joinColumns = @JoinColumn(name = "usuario_id"), inverseJoinColumns = @JoinColumn(name = "zona_id"))
+    private Set<Zona> zonasAsignadas = new HashSet<>();
 
     public Usuario() {
     }
@@ -108,5 +118,20 @@ public class Usuario {
 
     public void setCargo(String cargo) {
         this.cargo = cargo;
+    }
+
+    public Set<Zona> getZonasAsignadas() {
+        return zonasAsignadas;
+    }
+
+    public void setZonasAsignadas(Set<Zona> zonasAsignadas) {
+        this.zonasAsignadas = zonasAsignadas;
+    }
+
+    /**
+     * Verifica si el usuario tiene al menos una zona asignada
+     */
+    public boolean tieneZonasAsignadas() {
+        return zonasAsignadas != null && !zonasAsignadas.isEmpty();
     }
 }
