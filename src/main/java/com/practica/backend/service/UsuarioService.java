@@ -161,6 +161,50 @@ public class UsuarioService {
         }
 
         /**
+         * Filtra usuarios (sin zonas) según el cargo del admin autenticado.
+         * - ADMIN o null: ve todos
+         * - ADMIN_TEC: ve solo usuarios con cargo USER_TEC
+         * - ADMIN_COO: ve solo usuarios con cargo USER_COO
+         */
+        public List<UsuarioResponse> obtenerTodosFiltrados(String cargoAdmin) {
+                if (cargoAdmin == null || "ADMIN".equals(cargoAdmin)) {
+                        return obtenerTodos();
+                }
+
+                if ("ADMIN_TEC".equals(cargoAdmin)) {
+                        return usuarioRepository.findAllTecnicos()
+                                        .stream()
+                                        .map(u -> new UsuarioResponse(
+                                                        u.getId(),
+                                                        u.getIdentificacion(),
+                                                        u.getNombre(),
+                                                        u.getEmail(),
+                                                        u.getRol(),
+                                                        u.getFoto(),
+                                                        u.getTelefono(),
+                                                        u.getCargo()))
+                                        .toList();
+                }
+
+                if ("ADMIN_COO".equals(cargoAdmin)) {
+                        return usuarioRepository.findAllCoobradores()
+                                        .stream()
+                                        .map(u -> new UsuarioResponse(
+                                                        u.getId(),
+                                                        u.getIdentificacion(),
+                                                        u.getNombre(),
+                                                        u.getEmail(),
+                                                        u.getRol(),
+                                                        u.getFoto(),
+                                                        u.getTelefono(),
+                                                        u.getCargo()))
+                                        .toList();
+                }
+
+                return List.of();
+        }
+
+        /**
          * 🔄 Actualizar usuario parcialmente por ID (ADMIN)
          * Solo actualiza los campos que se envían en el request (no nulos y no vacíos)
          */

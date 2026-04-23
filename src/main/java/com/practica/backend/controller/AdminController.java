@@ -65,7 +65,12 @@ public class AdminController {
     // 👮 VER TODOS LOS USUARIOS
     @GetMapping("/usuarios")
     public ResponseEntity<?> todosLosUsuarios() {
-        return ResponseEntity.ok(usuarioService.obtenerTodos());
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
+
+        logger.info("👮 Admin con cargo {} consultando listado de usuarios", cargoAdmin);
+        return ResponseEntity.ok(usuarioService.obtenerTodosFiltrados(cargoAdmin));
     }
 
     // 👮 VER UN USUARIO ESPECÍFICO POR ID
