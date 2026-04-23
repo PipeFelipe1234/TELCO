@@ -180,7 +180,8 @@ public class RastreoZonaService {
 
         logger.warn("🚨 ALERTA: {}", mensajeBody);
 
-        List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
+        // Obtener admins según tipo de usuario
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
 
         for (Usuario admin : admins) {
             List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
@@ -320,7 +321,8 @@ public class RastreoZonaService {
 
         logger.warn("🚨 ALERTA: {}", mensajeBody);
 
-        List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
+        // Obtener admins según tipo de usuario
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
 
         for (Usuario admin : admins) {
             List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
@@ -362,7 +364,8 @@ public class RastreoZonaService {
         logger.warn("🚨 ALERTA: {} lleva {} minutos en la misma residencia ({}, {})",
                 empleado.getNombre(), minutos, latitud, longitud);
 
-        List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
+        // Obtener admins según tipo de usuario
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
 
         for (Usuario admin : admins) {
             List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
@@ -404,6 +407,29 @@ public class RastreoZonaService {
 
     /**
      * Obtiene el estado de rastreo de todos los empleados.
+     * Filtrado según el cargo del admin autenticado:
+     * - ADMIN (super admin) ve todos los empleados
+     * - ADMIN_TEC ve solo empleados USER_TEC
+     * - ADMIN_COO ve solo empleados USER_COO
+     */
+    public List<RastreoZonaResponse> obtenerTodosLosRastreosFiltrados(String cargoAdmin) {
+        List<RastreoZonaResponse> rastreos = obtenerTodosLosRastreos();
+
+        if ("ADMIN_TEC".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_TEC".equals(r.empleadoCargo()))
+                    .toList();
+        } else if ("ADMIN_COO".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_COO".equals(r.empleadoCargo()))
+                    .toList();
+        }
+        // ADMIN (super admin) ve todos
+        return rastreos;
+    }
+
+    /**
+     * Obtiene el estado de rastreo de todos los empleados.
      * Los minutos se calculan basándose en la RESIDENCIA, no en la zona.
      */
     public List<RastreoZonaResponse> obtenerTodosLosRastreos() {
@@ -419,6 +445,26 @@ public class RastreoZonaService {
                     return RastreoZonaResponse.fromEntity(r, minutos);
                 })
                 .toList();
+    }
+
+    /**
+     * Obtiene los rastreos en estado PREOCUPANTE
+     * Filtrado según el cargo del admin autenticado
+     */
+    public List<RastreoZonaResponse> obtenerRastreosPreocupantesFiltrados(String cargoAdmin) {
+        List<RastreoZonaResponse> rastreos = obtenerRastreosPreocupantes();
+
+        if ("ADMIN_TEC".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_TEC".equals(r.empleadoCargo()))
+                    .toList();
+        } else if ("ADMIN_COO".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_COO".equals(r.empleadoCargo()))
+                    .toList();
+        }
+        // ADMIN (super admin) ve todos
+        return rastreos;
     }
 
     /**
@@ -468,5 +514,30 @@ public class RastreoZonaService {
             rastreoRepository.delete(rastreo);
             logger.info("🗑️ Rastreo eliminado para {} (marcó salida)", empleado.getNombre());
         });
+    }
+
+    // ============================
+    // 🔔 MÉTODO HELPER - FILTRAR ADMINS
+    // ============================
+
+    /**
+     * Obtiene los admins a quienes enviar notificación según el cargo del usuario.
+     * - Si el usuario tiene cargo USER_TEC → envía a ADMIN + ADMIN_TEC
+     * - Si el usuario tiene cargo USER_COO → envía a ADMIN + ADMIN_COO
+     */
+    private List<Usuario> obtenerAdminsParaNotificacion(Usuario empleado) {
+        if ("USER_TEC".equals(empleado.getCargo())) {
+            // Usuario técnico: notificar a SUPER ADMIN + ADMIN_TEC
+            List<Usuario> admins = usuarioRepository.findAllSuperAdmins();
+            admins.addAll(usuarioRepository.findAllAdminsTecnicos());
+            return admins;
+        } else if ("USER_COO".equals(empleado.getCargo())) {
+            // Usuario coobrador: notificar a SUPER ADMIN + ADMIN_COO
+            List<Usuario> admins = usuarioRepository.findAllSuperAdmins();
+            admins.addAll(usuarioRepository.findAllAdminsCoobradores());
+            return admins;
+        }
+        // Si no es USER, devolver todos los admins
+        return usuarioRepository.findAllAdmins();
     }
 }

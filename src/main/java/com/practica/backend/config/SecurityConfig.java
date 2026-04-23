@@ -33,7 +33,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/zonas").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/zonas/{id}").authenticated()
 
-                        // ZONAS - Administración solo para ADMIN
+                        // ZONAS - Administración para admins
                         .requestMatchers(HttpMethod.GET, "/api/zonas/todas").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/zonas/rastreo/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/zonas/**").hasRole("ADMIN")

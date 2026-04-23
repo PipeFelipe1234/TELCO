@@ -3,11 +3,14 @@ package com.practica.backend.controller;
 import com.practica.backend.dto.RastreoZonaResponse;
 import com.practica.backend.dto.ZonaRequest;
 import com.practica.backend.dto.ZonaResponse;
+import com.practica.backend.entity.Usuario;
 import com.practica.backend.service.RastreoZonaService;
+import com.practica.backend.service.UsuarioService;
 import com.practica.backend.service.ZonaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,10 +30,13 @@ public class ZonaController {
 
     private final ZonaService zonaService;
     private final RastreoZonaService rastreoZonaService;
+    private final UsuarioService usuarioService;
 
-    public ZonaController(ZonaService zonaService, RastreoZonaService rastreoZonaService) {
+    public ZonaController(ZonaService zonaService, RastreoZonaService rastreoZonaService,
+            UsuarioService usuarioService) {
         this.zonaService = zonaService;
         this.rastreoZonaService = rastreoZonaService;
+        this.usuarioService = usuarioService;
     }
 
     // ============================
@@ -130,21 +136,33 @@ public class ZonaController {
 
     /**
      * Obtiene el estado de rastreo de todos los empleados.
-     * Ordenado por estado (PREOCUPANTE primero).
+     * Filtrado según el rol del admin autenticado:
+     * - ADMIN ve todos los empleados
+     * - ADMIN_TEC ve solo empleados técnicos
+     * - ADMIN_COO ve solo empleados coobradores
      */
     @GetMapping("/rastreo")
     public ResponseEntity<List<RastreoZonaResponse>> obtenerTodosLosRastreos() {
-        logger.info("📊 Consultando rastreo de todos los empleados");
-        return ResponseEntity.ok(rastreoZonaService.obtenerTodosLosRastreos());
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
+
+        logger.info("📊 Admin con cargo {} consultando rastreo de empleados", cargoAdmin);
+        return ResponseEntity.ok(rastreoZonaService.obtenerTodosLosRastreosFiltrados(cargoAdmin));
     }
 
     /**
      * Obtiene solo los empleados en estado PREOCUPANTE
+     * Filtrado según el rol del admin autenticado
      */
     @GetMapping("/rastreo/preocupantes")
     public ResponseEntity<List<RastreoZonaResponse>> obtenerRastreosPreocupantes() {
-        logger.info("🚨 Consultando empleados en estado PREOCUPANTE");
-        return ResponseEntity.ok(rastreoZonaService.obtenerRastreosPreocupantes());
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
+
+        logger.info("🚨 Admin con cargo {} consultando empleados PREOCUPANTES", cargoAdmin);
+        return ResponseEntity.ok(rastreoZonaService.obtenerRastreosPreocupantesFiltrados(cargoAdmin));
     }
 
     /**

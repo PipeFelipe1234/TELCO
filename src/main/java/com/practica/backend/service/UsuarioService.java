@@ -311,4 +311,44 @@ public class UsuarioService {
 
                 return UsuarioConZonasResponse.fromEntity(actualizado);
         }
+
+        /**
+         * Obtiene todos los usuarios técnicos (cargo USER_TEC)
+         */
+        public List<UsuarioConZonasResponse> obtenerTodosTecnicos() {
+                return usuarioRepository.findAllTecnicos()
+                                .stream()
+                                .map(UsuarioConZonasResponse::fromEntity)
+                                .toList();
+        }
+
+        /**
+         * Obtiene todos los usuarios coobradores (cargo USER_COO)
+         */
+        public List<UsuarioConZonasResponse> obtenerTodosCoobradores() {
+                return usuarioRepository.findAllCoobradores()
+                                .stream()
+                                .map(UsuarioConZonasResponse::fromEntity)
+                                .toList();
+        }
+
+        /**
+         * Filtra usuarios según el cargo del admin autenticado
+         * - ADMIN (super admin) ve todos los usuarios
+         * - ADMIN_TEC ve solo usuarios con cargo USER_TEC
+         * - ADMIN_COO ve solo usuarios con cargo USER_COO
+         */
+        public List<UsuarioConZonasResponse> obtenerUsuariosFiltrados(String cargoAdmin) {
+                if (cargoAdmin == null || "ADMIN".equals(cargoAdmin)) {
+                        // SUPER ADMIN ve todos
+                        return obtenerTodosConZonas();
+                } else if ("ADMIN_TEC".equals(cargoAdmin)) {
+                        // Admin Técnico ve solo técnicos
+                        return obtenerTodosTecnicos();
+                } else if ("ADMIN_COO".equals(cargoAdmin)) {
+                        // Admin Coobrador ve solo coobradores
+                        return obtenerTodosCoobradores();
+                }
+                return List.of();
+        }
 }
