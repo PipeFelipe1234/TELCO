@@ -75,6 +75,7 @@ public class ZonaService {
                 request.nombre(),
                 coordenadasJson,
                 request.color() != null ? request.color() : "#FF0000");
+        zona.setNodo(request.nodo());
 
         zona = zonaRepository.save(zona);
         logger.info("✅ Zona creada: {} con {} puntos", zona.getNombre(), request.coordenadas().size());
@@ -91,6 +92,7 @@ public class ZonaService {
                 .orElseThrow(() -> new RuntimeException("Zona no encontrada con ID: " + id));
 
         zona.setNombre(request.nombre());
+        zona.setNodo(request.nodo());
         zona.setCoordenadas(convertirCoordenadasAJson(request.coordenadas()));
         if (request.color() != null) {
             zona.setColor(request.color());
@@ -176,6 +178,11 @@ public class ZonaService {
                     color = properties.get("fill").asText();
                 }
 
+                String nodo = null;
+                if (properties != null && properties.has("nodo")) {
+                    nodo = properties.get("nodo").asText();
+                }
+
                 // Obtener coordenadas del polígono
                 // GeoJSON usa [longitude, latitude], nosotros guardamos como [[lng, lat], ...]
                 JsonNode coordinates = geometry.get("coordinates");
@@ -194,6 +201,7 @@ public class ZonaService {
                     String coordenadasJson = objectMapper.writeValueAsString(coordenadasList);
 
                     Zona zona = new Zona(nombre, coordenadasJson, color);
+                    zona.setNodo(nodo);
                     zona = zonaRepository.save(zona);
                     zonasImportadas.add(convertirAResponse(zona));
 
@@ -243,6 +251,13 @@ public class ZonaService {
         }
 
         return null;
+    }
+
+    /**
+     * Retorna entidades de zonas activas para lógica interna de rastreo.
+     */
+    public List<Zona> obtenerEntidadesZonasActivas() {
+        return zonaRepository.findByActivaTrue();
     }
 
     /**
@@ -329,6 +344,7 @@ public class ZonaService {
             return new ZonaResponse(
                     zona.getId(),
                     zona.getNombre(),
+                    zona.getNodo(),
                     coordenadasDTO,
                     zona.getColor(),
                     zona.getActiva());
