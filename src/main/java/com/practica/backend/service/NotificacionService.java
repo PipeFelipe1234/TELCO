@@ -7,18 +7,23 @@ import com.google.firebase.messaging.SendResponse;
 import com.practica.backend.entity.TokenDispositivo;
 import com.practica.backend.entity.Usuario;
 import com.practica.backend.repository.TokenDispositivoRepository;
+import com.practica.backend.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 @Service
 public class NotificacionService {
 
     private final TokenDispositivoRepository tokenDispositivoRepository;
+    private final UsuarioRepository usuarioRepository;
 
-    public NotificacionService(TokenDispositivoRepository tokenDispositivoRepository) {
+    public NotificacionService(TokenDispositivoRepository tokenDispositivoRepository,
+            UsuarioRepository usuarioRepository) {
         this.tokenDispositivoRepository = tokenDispositivoRepository;
+        this.usuarioRepository = usuarioRepository;
     }
 
     /**
@@ -65,6 +70,45 @@ public class NotificacionService {
         List<String> tokenList = tokens.stream()
                 .map(TokenDispositivo::getToken)
                 .toList();
+
+        enviarNotificacionAMultiplesDispositivos(tokenList, titulo, mensaje, datos);
+    }
+
+    /**
+     * 📲 Envía notificación a los admins que corresponden según el cargo del
+     * empleado.
+     * - USER_TEC → ADMIN (super) + ADMIN_TEC
+     * - USER_COO → ADMIN (super) + ADMIN_COO
+     * - Cualquier otro → todos los admins
+     */
+    public void enviarNotificacionFiltradaPorCargo(
+            String cargoEmpleado,
+            String titulo,
+            String mensaje,
+            Map<String, String> datos) {
+
+        List<Usuario> admins;
+        if ("USER_TEC".equals(cargoEmpleado)) {
+            admins = Stream.concat(
+                    usuarioRepository.findAllSuperAdmins().stream(),
+                    usuarioRepository.findAllAdminsTecnicos().stream()).toList();
+        } else if ("USER_COO".equals(cargoEmpleado)) {
+            admins = Stream.concat(
+                    usuarioRepository.findAllSuperAdmins().stream(),
+                    usuarioRepository.findAllAdminsCoobradores().stream()).toList();
+        } else {
+            admins = usuarioRepository.findAllAdmins();
+        }
+
+        List<String> tokenList = admins.stream()
+                .flatMap(a -> tokenDispositivoRepository.findTokensActivosByUsuario(a).stream())
+                .map(TokenDispositivo::getToken)
+                .toList();
+
+        if (tokenList.isEmpty()) {
+            System.out.println("⚠️  No hay admins con dispositivos registrados para cargo: " + cargoEmpleado);
+            return;
+        }
 
         enviarNotificacionAMultiplesDispositivos(tokenList, titulo, mensaje, datos);
     }
