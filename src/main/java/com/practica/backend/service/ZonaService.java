@@ -165,8 +165,8 @@ public class ZonaService {
                 // Obtener nombre de la zona
                 String nombre = "Zona " + contador;
                 if (properties != null) {
-                    if (properties.has("nombre")) {
-                        nombre = properties.get("nombre").asText();
+                    if (properties.has("Name")) {
+                        nombre = properties.get("Name").asText();
                     } else if (properties.has("zona")) {
                         nombre = "Zona " + properties.get("zona").asText();
                     }
