@@ -22,6 +22,13 @@ public class Zona {
     private String nombre;
 
     /**
+     * Nodo lógico al que pertenece la zona.
+     * Un nodo puede tener múltiples zonas.
+     */
+    @Column(length = 100)
+    private String nodo;
+
+    /**
      * Coordenadas del polígono en formato JSON.
      * Formato: [[lng1,lat1],[lng2,lat2],...,[lng1,lat1]]
      * (El último punto debe ser igual al primero para cerrar el polígono)
@@ -88,6 +95,14 @@ public class Zona {
 
     public void setNombre(String nombre) {
         this.nombre = nombre;
+    }
+
+    public String getNodo() {
+        return nodo;
+    }
+
+    public void setNodo(String nodo) {
+        this.nodo = nodo;
     }
 
     public String getCoordenadas() {

@@ -16,6 +16,7 @@ public record RastreoZonaResponse(
         Long empleadoId,
         String empleadoNombre,
         String empleadoIdentificacion,
+        String empleadoCargo,
         Long zonaId,
         String zonaNombre,
         boolean dentroDeZona,
@@ -30,6 +31,7 @@ public record RastreoZonaResponse(
                 rastreo.getEmpleado().getId(),
                 rastreo.getEmpleado().getNombre(),
                 rastreo.getEmpleado().getIdentificacion(),
+                rastreo.getEmpleado().getCargo(),
                 rastreo.getZonaActual() != null ? rastreo.getZonaActual().getId() : null,
                 rastreo.getZonaActual() != null ? rastreo.getZonaActual().getNombre() : "Fuera de zona",
                 rastreo.getZonaActual() != null, // dentroDeZona

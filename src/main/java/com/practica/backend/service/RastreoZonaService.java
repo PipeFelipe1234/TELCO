@@ -22,7 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Servicio para rastrear empleados con dos niveles:
@@ -69,7 +71,7 @@ public class RastreoZonaService {
      * Procesa una nueva ubicación de un empleado.
      * 
      * Dos niveles de rastreo:
-     * 1. ZONA ASIGNADA: Detecta si salió de SUS zonas asignadas → envía
+     * 1. NODO ASIGNADO: Detecta si salió de SUS nodos asignados → envía
      * notificación
      * 2. RESIDENCIA: Detecta tiempo en el mismo punto → estados
      * BIEN/NORMAL/PREOCUPANTE
@@ -98,9 +100,9 @@ public class RastreoZonaService {
         LocalDateTime ahora = LocalDateTime.now(ZONA_COLOMBIA);
 
         // ==========================================
-        // 1. RASTREO DE ZONA ASIGNADA (detectar si salió de SUS zonas)
+        // 1. RASTREO DE NODOS ASIGNADOS (detectar si salió de SUS nodos)
         // ==========================================
-        procesarRastreoZonasAsignadas(rastreo, empleadoConZonas, latitud, longitud, ahora);
+        procesarRastreoNodosAsignados(rastreo, empleadoConZonas, latitud, longitud, ahora);
 
         // ==========================================
         // 2. RASTREO DE RESIDENCIA (tiempo en punto)
@@ -113,11 +115,12 @@ public class RastreoZonaService {
     }
 
     /**
-     * Procesa el rastreo de zonas ASIGNADAS al usuario.
-     * Solo envía notificación si el usuario tiene zonas asignadas y sale de TODAS
-     * ellas.
+     * Procesa el rastreo por NODOS asignados al usuario.
+     * Si el usuario no tiene nodos configurados en sus zonas, usa la lógica legacy
+     * por
+     * zonas asignadas.
      */
-    private void procesarRastreoZonasAsignadas(RastreoZona rastreo, Usuario empleado,
+    private void procesarRastreoNodosAsignados(RastreoZona rastreo, Usuario empleado,
             double latitud, double longitud, LocalDateTime ahora) {
         // Verificar si el usuario tiene zonas asignadas
         if (!empleado.tieneZonasAsignadas()) {
@@ -127,34 +130,83 @@ public class RastreoZonaService {
             return;
         }
 
-        // Buscar si está en alguna de SUS zonas asignadas
-        Zona zonaActual = encontrarZonaAsignadaParaEmpleado(empleado, latitud, longitud);
+        Set<String> nodosAsignados = obtenerNodosAsignados(empleado);
+
+        // Buscar si está dentro de alguno de SUS nodos asignados
+        Zona zonaActual = nodosAsignados.isEmpty()
+                ? encontrarZonaAsignadaParaEmpleado(empleado, latitud, longitud)
+                : encontrarZonaEnNodosAsignados(nodosAsignados, latitud, longitud);
+
         Zona zonaAnterior = rastreo.getZonaActual();
 
         if (zonaActual == null) {
-            // No está en NINGUNA de sus zonas asignadas
+            // No está en NINGUNO de sus nodos asignados
             if (zonaAnterior != null && !Boolean.TRUE.equals(rastreo.getNotificacionSalioZonaEnviada())) {
-                // Estaba en una zona asignada y ahora salió - enviar notificación
-                enviarNotificacionSalioDeZona(empleado, zonaAnterior);
+                // Estaba dentro de un nodo/zona permitido y ahora salió
+                if (nodosAsignados.isEmpty()) {
+                    enviarNotificacionSalioDeZona(empleado, zonaAnterior);
+                } else {
+                    enviarNotificacionSalioDeNodo(empleado, zonaAnterior.getNodo());
+                }
                 rastreo.setNotificacionSalioZonaEnviada(true);
             } else if (zonaAnterior == null && !Boolean.TRUE.equals(rastreo.getNotificacionSalioZonaEnviada())) {
-                // Primera ubicación y ya está fuera de todas sus zonas - notificar
-                logger.warn("⚠️ {} está fuera de todas sus zonas asignadas", empleado.getNombre());
-                enviarNotificacionFueraDeZonasAsignadas(empleado);
+                // Primera ubicación y ya está fuera de todos sus nodos - notificar
+                if (nodosAsignados.isEmpty()) {
+                    logger.warn("⚠️ {} está fuera de todas sus zonas asignadas", empleado.getNombre());
+                    enviarNotificacionFueraDeZonasAsignadas(empleado);
+                } else {
+                    logger.warn("⚠️ {} está fuera de todos sus nodos asignados", empleado.getNombre());
+                    enviarNotificacionFueraDeNodosAsignados(empleado);
+                }
                 rastreo.setNotificacionSalioZonaEnviada(true);
             }
             rastreo.setZonaActual(null);
             rastreo.setTimestampEntradaZona(null);
         } else {
-            // Está en alguna de sus zonas asignadas
+            // Está en uno de sus nodos permitidos
             if (zonaAnterior == null || !zonaAnterior.getId().equals(zonaActual.getId())) {
-                // Entró a una de sus zonas asignadas
-                logger.info("👤 {} entró a su zona asignada: {}", empleado.getNombre(), zonaActual.getNombre());
+                logger.info("👤 {} entró a zona {} del nodo {}",
+                        empleado.getNombre(),
+                        zonaActual.getNombre(),
+                        zonaActual.getNodo());
                 rastreo.setZonaActual(zonaActual);
                 rastreo.setTimestampEntradaZona(ahora);
                 rastreo.setNotificacionSalioZonaEnviada(false); // Resetear flag
             }
         }
+    }
+
+    private Set<String> obtenerNodosAsignados(Usuario empleado) {
+        Set<String> nodos = new HashSet<>();
+        for (Zona zona : empleado.getZonasAsignadas()) {
+            if (zona.getActiva()) {
+                String nodoNormalizado = normalizarNodo(zona.getNodo());
+                if (nodoNormalizado != null) {
+                    nodos.add(nodoNormalizado);
+                }
+            }
+        }
+        return nodos;
+    }
+
+    private Zona encontrarZonaEnNodosAsignados(Set<String> nodosAsignados, double latitud, double longitud) {
+        for (Zona zona : zonaService.obtenerEntidadesZonasActivas()) {
+            String nodoNormalizado = normalizarNodo(zona.getNodo());
+            if (nodoNormalizado != null
+                    && nodosAsignados.contains(nodoNormalizado)
+                    && zonaService.estaDentroDeZona(latitud, longitud, zona)) {
+                return zona;
+            }
+        }
+        return null;
+    }
+
+    private String normalizarNodo(String nodo) {
+        if (nodo == null) {
+            return null;
+        }
+        String valor = nodo.trim();
+        return valor.isEmpty() ? null : valor.toUpperCase();
     }
 
     /**
@@ -180,7 +232,8 @@ public class RastreoZonaService {
 
         logger.warn("🚨 ALERTA: {}", mensajeBody);
 
-        List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
+        // Obtener admins según tipo de usuario
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
 
         for (Usuario admin : admins) {
             List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
@@ -204,6 +257,49 @@ public class RastreoZonaService {
 
                     FirebaseMessaging.getInstance().send(message);
                     logger.info("📱 Notificación 'fuera de zonas asignadas' enviada al admin {}", admin.getNombre());
+
+                } catch (FirebaseMessagingException e) {
+                    logger.error("❌ Error al enviar notificación a {}: {}", admin.getNombre(), e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Envía notificación cuando el empleado está fuera de TODOS sus nodos
+     * asignados.
+     */
+    private void enviarNotificacionFueraDeNodosAsignados(Usuario empleado) {
+        String cargo = empleado.getCargo() != null ? empleado.getCargo() : "Empleado";
+        String mensajeBody = "El " + cargo + " " + empleado.getNombre() + " está fuera de sus nodos asignados";
+
+        logger.warn("🚨 ALERTA: {}", mensajeBody);
+
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
+
+        for (Usuario admin : admins) {
+            List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
+
+            for (TokenDispositivo tokenDispositivo : tokens) {
+                try {
+                    Message message = Message.builder()
+                            .setToken(tokenDispositivo.getToken())
+                            .setNotification(Notification.builder()
+                                    .setTitle("⚠️ Empleado Fuera de Nodo")
+                                    .setBody(mensajeBody)
+                                    .build())
+                            .putData("type", "ALERTA_FUERA_ZONAS_ASIGNADAS")
+                            .putData("scope", "NODO")
+                            .putData("empleadoId", String.valueOf(empleado.getId()))
+                            .putData("empleadoNombre", empleado.getNombre())
+                            .putData("empleadoCargo", cargo)
+                            .setAndroidConfig(AndroidConfig.builder()
+                                    .setPriority(AndroidConfig.Priority.HIGH)
+                                    .build())
+                            .build();
+
+                    FirebaseMessaging.getInstance().send(message);
+                    logger.info("📱 Notificación 'fuera de nodos asignados' enviada al admin {}", admin.getNombre());
 
                 } catch (FirebaseMessagingException e) {
                     logger.error("❌ Error al enviar notificación a {}: {}", admin.getNombre(), e.getMessage());
@@ -320,7 +416,8 @@ public class RastreoZonaService {
 
         logger.warn("🚨 ALERTA: {}", mensajeBody);
 
-        List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
+        // Obtener admins según tipo de usuario
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
 
         for (Usuario admin : admins) {
             List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
@@ -355,6 +452,50 @@ public class RastreoZonaService {
     }
 
     /**
+     * Envía notificación cuando el empleado sale del nodo permitido.
+     */
+    private void enviarNotificacionSalioDeNodo(Usuario empleado, String nodo) {
+        String cargo = empleado.getCargo() != null ? empleado.getCargo() : "Empleado";
+        String nodoLabel = (nodo == null || nodo.isBlank()) ? "su nodo asignado" : nodo;
+        String mensajeBody = "El " + cargo + " " + empleado.getNombre() + " está fuera del nodo " + nodoLabel;
+
+        logger.warn("🚨 ALERTA: {}", mensajeBody);
+
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
+
+        for (Usuario admin : admins) {
+            List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
+
+            for (TokenDispositivo tokenDispositivo : tokens) {
+                try {
+                    Message message = Message.builder()
+                            .setToken(tokenDispositivo.getToken())
+                            .setNotification(Notification.builder()
+                                    .setTitle("⚠️ Empleado Fuera de Nodo")
+                                    .setBody(mensajeBody)
+                                    .build())
+                            .putData("type", "ALERTA_SALIO_ZONA")
+                            .putData("scope", "NODO")
+                            .putData("empleadoId", String.valueOf(empleado.getId()))
+                            .putData("empleadoNombre", empleado.getNombre())
+                            .putData("empleadoCargo", cargo)
+                            .putData("nodo", nodoLabel)
+                            .setAndroidConfig(AndroidConfig.builder()
+                                    .setPriority(AndroidConfig.Priority.HIGH)
+                                    .build())
+                            .build();
+
+                    FirebaseMessaging.getInstance().send(message);
+                    logger.info("📱 Notificación 'salió de nodo' enviada al admin {}", admin.getNombre());
+
+                } catch (FirebaseMessagingException e) {
+                    logger.error("❌ Error al enviar notificación a {}: {}", admin.getNombre(), e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
      * Envía notificación cuando el empleado lleva demasiado tiempo en la misma
      * RESIDENCIA
      */
@@ -362,7 +503,8 @@ public class RastreoZonaService {
         logger.warn("🚨 ALERTA: {} lleva {} minutos en la misma residencia ({}, {})",
                 empleado.getNombre(), minutos, latitud, longitud);
 
-        List<Usuario> admins = usuarioRepository.findByRol("ADMIN");
+        // Obtener admins según tipo de usuario
+        List<Usuario> admins = obtenerAdminsParaNotificacion(empleado);
 
         for (Usuario admin : admins) {
             List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(admin);
@@ -404,6 +546,29 @@ public class RastreoZonaService {
 
     /**
      * Obtiene el estado de rastreo de todos los empleados.
+     * Filtrado según el cargo del admin autenticado:
+     * - ADMIN (super admin) ve todos los empleados
+     * - ADMIN_TEC ve solo empleados USER_TEC
+     * - ADMIN_COO ve solo empleados USER_COO
+     */
+    public List<RastreoZonaResponse> obtenerTodosLosRastreosFiltrados(String cargoAdmin) {
+        List<RastreoZonaResponse> rastreos = obtenerTodosLosRastreos();
+
+        if ("ADMIN_TEC".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_TEC".equals(r.empleadoCargo()))
+                    .toList();
+        } else if ("ADMIN_COO".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_COO".equals(r.empleadoCargo()))
+                    .toList();
+        }
+        // ADMIN (super admin) ve todos
+        return rastreos;
+    }
+
+    /**
+     * Obtiene el estado de rastreo de todos los empleados.
      * Los minutos se calculan basándose en la RESIDENCIA, no en la zona.
      */
     public List<RastreoZonaResponse> obtenerTodosLosRastreos() {
@@ -419,6 +584,26 @@ public class RastreoZonaService {
                     return RastreoZonaResponse.fromEntity(r, minutos);
                 })
                 .toList();
+    }
+
+    /**
+     * Obtiene los rastreos en estado PREOCUPANTE
+     * Filtrado según el cargo del admin autenticado
+     */
+    public List<RastreoZonaResponse> obtenerRastreosPreocupantesFiltrados(String cargoAdmin) {
+        List<RastreoZonaResponse> rastreos = obtenerRastreosPreocupantes();
+
+        if ("ADMIN_TEC".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_TEC".equals(r.empleadoCargo()))
+                    .toList();
+        } else if ("ADMIN_COO".equals(cargoAdmin)) {
+            return rastreos.stream()
+                    .filter(r -> "USER_COO".equals(r.empleadoCargo()))
+                    .toList();
+        }
+        // ADMIN (super admin) ve todos
+        return rastreos;
     }
 
     /**
@@ -468,5 +653,30 @@ public class RastreoZonaService {
             rastreoRepository.delete(rastreo);
             logger.info("🗑️ Rastreo eliminado para {} (marcó salida)", empleado.getNombre());
         });
+    }
+
+    // ============================
+    // 🔔 MÉTODO HELPER - FILTRAR ADMINS
+    // ============================
+
+    /**
+     * Obtiene los admins a quienes enviar notificación según el cargo del usuario.
+     * - Si el usuario tiene cargo USER_TEC → envía a ADMIN + ADMIN_TEC
+     * - Si el usuario tiene cargo USER_COO → envía a ADMIN + ADMIN_COO
+     */
+    private List<Usuario> obtenerAdminsParaNotificacion(Usuario empleado) {
+        if ("USER_TEC".equals(empleado.getCargo())) {
+            // Usuario técnico: notificar a SUPER ADMIN + ADMIN_TEC
+            List<Usuario> admins = usuarioRepository.findAllSuperAdmins();
+            admins.addAll(usuarioRepository.findAllAdminsTecnicos());
+            return admins;
+        } else if ("USER_COO".equals(empleado.getCargo())) {
+            // Usuario coobrador: notificar a SUPER ADMIN + ADMIN_COO
+            List<Usuario> admins = usuarioRepository.findAllSuperAdmins();
+            admins.addAll(usuarioRepository.findAllAdminsCoobradores());
+            return admins;
+        }
+        // Si no es USER, devolver todos los admins
+        return usuarioRepository.findAllAdmins();
     }
 }

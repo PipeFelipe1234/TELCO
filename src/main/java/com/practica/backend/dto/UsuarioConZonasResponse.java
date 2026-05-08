@@ -3,7 +3,6 @@ package com.practica.backend.dto;
 import com.practica.backend.entity.Usuario;
 import com.practica.backend.entity.Zona;
 import java.util.List;
-import java.util.Set;
 
 /**
  * DTO extendido de Usuario que incluye las zonas asignadas
@@ -24,13 +23,13 @@ public record UsuarioConZonasResponse(
      */
     public record ZonaSimpleResponse(
             Long id,
-            String nombre,
+            String nodo,
             String color) {
 
         public static ZonaSimpleResponse fromEntity(Zona zona) {
             return new ZonaSimpleResponse(
                     zona.getId(),
-                    zona.getNombre(),
+                    zona.getNodo(),
                     zona.getColor());
         }
     }

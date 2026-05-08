@@ -65,7 +65,12 @@ public class AdminController {
     // 👮 VER TODOS LOS USUARIOS
     @GetMapping("/usuarios")
     public ResponseEntity<?> todosLosUsuarios() {
-        return ResponseEntity.ok(usuarioService.obtenerTodos());
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
+
+        logger.info("👮 Admin con cargo {} consultando listado de usuarios", cargoAdmin);
+        return ResponseEntity.ok(usuarioService.obtenerTodosFiltrados(cargoAdmin));
     }
 
     // 👮 VER UN USUARIO ESPECÍFICO POR ID
@@ -390,11 +395,19 @@ public class AdminController {
 
     /**
      * Obtiene todos los usuarios con sus zonas asignadas
+     * Filtrado según el rol del admin autenticado:
+     * - ADMIN ve todos (USER_TEC + USER_COO)
+     * - ADMIN_TEC ve solo técnicos
+     * - ADMIN_COO ve solo coobradores
      */
     @GetMapping("/usuarios/con-zonas")
     public ResponseEntity<List<UsuarioConZonasResponse>> obtenerUsuariosConZonas() {
-        logger.info("📍 Consultando usuarios con sus zonas asignadas");
-        return ResponseEntity.ok(usuarioService.obtenerTodosConZonas());
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
+
+        logger.info("📍 Admin con cargo {} consultando usuarios", cargoAdmin);
+        return ResponseEntity.ok(usuarioService.obtenerUsuariosFiltrados(cargoAdmin));
     }
 
     /**

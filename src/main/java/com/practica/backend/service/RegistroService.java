@@ -1,11 +1,15 @@
 package com.practica.backend.service;
 
+import com.practica.backend.dto.AgregarReporteRequest;
 import com.practica.backend.dto.MarcarEntradaRequest;
 import com.practica.backend.dto.MarcarSalidaRequest;
+import com.practica.backend.dto.ReporteTurnoResponse;
 import com.practica.backend.dto.RegistroFilterRequest;
 import com.practica.backend.dto.RegistroResponse;
 import com.practica.backend.entity.Registro;
+import com.practica.backend.entity.RegistroReporte;
 import com.practica.backend.entity.Usuario;
+import com.practica.backend.repository.RegistroReporteRepository;
 import com.practica.backend.repository.RegistroRepository;
 import org.springframework.stereotype.Service;
 
@@ -22,14 +26,18 @@ import java.util.Map;
 public class RegistroService {
 
     private final RegistroRepository registroRepository;
+    private final RegistroReporteRepository registroReporteRepository;
     private final NotificacionService notificacionService;
     private final GeocodingService geocodingService;
     private final RastreoZonaService rastreoZonaService;
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
 
-    public RegistroService(RegistroRepository registroRepository, NotificacionService notificacionService,
+    public RegistroService(RegistroRepository registroRepository,
+            RegistroReporteRepository registroReporteRepository,
+            NotificacionService notificacionService,
             GeocodingService geocodingService, RastreoZonaService rastreoZonaService) {
         this.registroRepository = registroRepository;
+        this.registroReporteRepository = registroReporteRepository;
         this.notificacionService = notificacionService;
         this.geocodingService = geocodingService;
         this.rastreoZonaService = rastreoZonaService;
@@ -136,6 +144,17 @@ public class RegistroService {
         }
         registro.setUbicacionSalida(ubicacionSalida);
 
+        crearReporteTurno(
+                registro,
+                request.latitud(),
+                request.longitud(),
+                request.precisionMetros(),
+                request.reporte(),
+                request.picture(),
+                ubicacionSalida,
+                fechaHoraRegistro != null ? fechaHoraRegistro : LocalDateTime.now(),
+                true);
+
         // ⏱️ Calcular horas trabajadas considerando que pueden ser días diferentes
         LocalDateTime fechaHoraEntrada = LocalDateTime.of(registro.getFecha(), registro.getHoraEntrada());
         LocalDateTime fechaHoraSalidaFinal = LocalDateTime.of(fechaSalida, horaSalida);
@@ -156,6 +175,51 @@ public class RegistroService {
 
         // �📲 ENVIAR NOTIFICACIÓN A LOS ADMINS
         enviarNotificacionSalida(guardado);
+
+        return mapToResponse(guardado);
+    }
+
+    public RegistroResponse agregarReporte(Usuario usuario, AgregarReporteRequest request) {
+        // Buscar el turno actual en curso
+        Registro registro = registroRepository
+                .findUltimoRegistroSinSalida(usuario)
+                .orElseThrow(() -> new RuntimeException("No hay entrada sin salida registrada"));
+
+        // Validar precisión GPS
+        if (request.precisionMetros() != null && request.precisionMetros() > 50) {
+            throw new RuntimeException("Precisión GPS insuficiente para registrar reporte");
+        }
+
+        LocalDateTime fechaHoraReporte = parseISODateTime(request.fechaCreacion());
+        if (fechaHoraReporte == null) {
+            fechaHoraReporte = LocalDateTime.now();
+        }
+
+        String ubicacion = request.ubicacion();
+        if ((ubicacion == null || ubicacion.trim().isEmpty())
+                && request.latitud() != null
+                && request.longitud() != null) {
+            ubicacion = geocodingService.obtenerDireccion(request.latitud(), request.longitud());
+        }
+
+        crearReporteTurno(
+                registro,
+                request.latitud(),
+                request.longitud(),
+                request.precisionMetros(),
+                request.reporte(),
+                request.picture(),
+                ubicacion,
+                fechaHoraReporte,
+                false);
+
+        // Mantener visibilidad rápida del último reporte en campos legacy
+        registro.setReporte(request.reporte());
+        registro.setPicture(request.picture());
+        Registro guardado = registroRepository.save(registro);
+
+        // 📲 ENVIAR NOTIFICACIÓN AL ADMIN CORRESPONDIENTE
+        enviarNotificacionReporte(guardado);
 
         return mapToResponse(guardado);
     }
@@ -212,6 +276,12 @@ public class RegistroService {
             }
         }
 
+        List<ReporteTurnoResponse> reportes = registroReporteRepository
+                .findByRegistroOrderByFechaHoraAsc(r)
+                .stream()
+                .map(this::mapReporteToResponse)
+                .toList();
+
         return new RegistroResponse(
                 r.getId(),
                 r.getFecha(),
@@ -234,7 +304,44 @@ public class RegistroService {
                 minutosTrabajados,
                 enCurso,
                 r.getUbicacionEntrada(),
-                r.getUbicacionSalida());
+                r.getUbicacionSalida(),
+                reportes);
+    }
+
+    private void crearReporteTurno(
+            Registro registro,
+            Double latitud,
+            Double longitud,
+            Double precisionMetros,
+            String reporte,
+            String picture,
+            String ubicacion,
+            LocalDateTime fechaHora,
+            boolean esSalida) {
+        RegistroReporte reporteTurno = new RegistroReporte();
+        reporteTurno.setRegistro(registro);
+        reporteTurno.setLatitud(latitud);
+        reporteTurno.setLongitud(longitud);
+        reporteTurno.setPrecisionMetros(precisionMetros);
+        reporteTurno.setReporte(reporte);
+        reporteTurno.setPicture(picture);
+        reporteTurno.setUbicacion(ubicacion);
+        reporteTurno.setFechaHora(fechaHora);
+        reporteTurno.setEsSalida(esSalida);
+        registroReporteRepository.save(reporteTurno);
+    }
+
+    private ReporteTurnoResponse mapReporteToResponse(RegistroReporte reporte) {
+        return new ReporteTurnoResponse(
+                reporte.getId(),
+                reporte.getFechaHora(),
+                reporte.getLatitud(),
+                reporte.getLongitud(),
+                reporte.getPrecisionMetros(),
+                reporte.getReporte(),
+                reporte.getPicture(),
+                reporte.getUbicacion(),
+                reporte.getEsSalida());
     }
 
     // 📲 NOTIFICACIÓN DE ENTRADA
@@ -250,7 +357,8 @@ public class RegistroService {
             String titulo = "✅ Entrada Registrada";
             String mensaje = registro.getUsuario().getNombre() + " marcó Entrada";
 
-            notificacionService.enviarNotificacionAAdmins(titulo, mensaje, datos);
+            notificacionService.enviarNotificacionFiltradaPorCargo(
+                    registro.getUsuario().getCargo(), titulo, mensaje, datos);
         } catch (Exception e) {
             System.err.println("❌ Error al enviar notificación de entrada: " + e.getMessage());
         }
@@ -269,9 +377,32 @@ public class RegistroService {
             String titulo = "🚪 Salida Registrada";
             String mensaje = registro.getUsuario().getNombre() + " marcó Salida";
 
-            notificacionService.enviarNotificacionAAdmins(titulo, mensaje, datos);
+            notificacionService.enviarNotificacionFiltradaPorCargo(
+                    registro.getUsuario().getCargo(), titulo, mensaje, datos);
         } catch (Exception e) {
             System.err.println("❌ Error al enviar notificación de salida: " + e.getMessage());
+        }
+    }
+
+    // 📲 NOTIFICACIÓN DE REPORTE INTERMEDIO
+    private void enviarNotificacionReporte(Registro registro) {
+        try {
+            Map<String, String> datos = new HashMap<>();
+            datos.put("tipo", "REPORTE");
+            datos.put("registroId", registro.getId().toString());
+            datos.put("usuarioId", registro.getUsuario().getId().toString());
+            datos.put("fecha", registro.getFecha().toString());
+
+            String cargo = registro.getUsuario().getCargo() != null
+                    ? registro.getUsuario().getCargo()
+                    : "Empleado";
+            String titulo = "📋 Nuevo Reporte";
+            String mensaje = registro.getUsuario().getNombre() + " " + cargo + " envió un reporte";
+
+            notificacionService.enviarNotificacionFiltradaPorCargo(
+                    registro.getUsuario().getCargo(), titulo, mensaje, datos);
+        } catch (Exception e) {
+            System.err.println("❌ Error al enviar notificación de reporte: " + e.getMessage());
         }
     }
 }

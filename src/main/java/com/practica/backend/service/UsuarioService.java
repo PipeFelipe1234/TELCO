@@ -161,6 +161,50 @@ public class UsuarioService {
         }
 
         /**
+         * Filtra usuarios (sin zonas) según el cargo del admin autenticado.
+         * - ADMIN o null: ve todos
+         * - ADMIN_TEC: ve solo usuarios con cargo USER_TEC
+         * - ADMIN_COO: ve solo usuarios con cargo USER_COO
+         */
+        public List<UsuarioResponse> obtenerTodosFiltrados(String cargoAdmin) {
+                if (cargoAdmin == null || "ADMIN".equals(cargoAdmin)) {
+                        return obtenerTodos();
+                }
+
+                if ("ADMIN_TEC".equals(cargoAdmin)) {
+                        return usuarioRepository.findAllTecnicos()
+                                        .stream()
+                                        .map(u -> new UsuarioResponse(
+                                                        u.getId(),
+                                                        u.getIdentificacion(),
+                                                        u.getNombre(),
+                                                        u.getEmail(),
+                                                        u.getRol(),
+                                                        u.getFoto(),
+                                                        u.getTelefono(),
+                                                        u.getCargo()))
+                                        .toList();
+                }
+
+                if ("ADMIN_COO".equals(cargoAdmin)) {
+                        return usuarioRepository.findAllCoobradores()
+                                        .stream()
+                                        .map(u -> new UsuarioResponse(
+                                                        u.getId(),
+                                                        u.getIdentificacion(),
+                                                        u.getNombre(),
+                                                        u.getEmail(),
+                                                        u.getRol(),
+                                                        u.getFoto(),
+                                                        u.getTelefono(),
+                                                        u.getCargo()))
+                                        .toList();
+                }
+
+                return List.of();
+        }
+
+        /**
          * 🔄 Actualizar usuario parcialmente por ID (ADMIN)
          * Solo actualiza los campos que se envían en el request (no nulos y no vacíos)
          */
@@ -310,5 +354,45 @@ public class UsuarioService {
                 logger.info("📍 Zona {} removida del usuario {}", zonaId, usuario.getNombre());
 
                 return UsuarioConZonasResponse.fromEntity(actualizado);
+        }
+
+        /**
+         * Obtiene todos los usuarios técnicos (cargo USER_TEC)
+         */
+        public List<UsuarioConZonasResponse> obtenerTodosTecnicos() {
+                return usuarioRepository.findAllTecnicos()
+                                .stream()
+                                .map(UsuarioConZonasResponse::fromEntity)
+                                .toList();
+        }
+
+        /**
+         * Obtiene todos los usuarios coobradores (cargo USER_COO)
+         */
+        public List<UsuarioConZonasResponse> obtenerTodosCoobradores() {
+                return usuarioRepository.findAllCoobradores()
+                                .stream()
+                                .map(UsuarioConZonasResponse::fromEntity)
+                                .toList();
+        }
+
+        /**
+         * Filtra usuarios según el cargo del admin autenticado
+         * - ADMIN (super admin) ve todos los usuarios
+         * - ADMIN_TEC ve solo usuarios con cargo USER_TEC
+         * - ADMIN_COO ve solo usuarios con cargo USER_COO
+         */
+        public List<UsuarioConZonasResponse> obtenerUsuariosFiltrados(String cargoAdmin) {
+                if (cargoAdmin == null || "ADMIN".equals(cargoAdmin)) {
+                        // SUPER ADMIN ve todos
+                        return obtenerTodosConZonas();
+                } else if ("ADMIN_TEC".equals(cargoAdmin)) {
+                        // Admin Técnico ve solo técnicos
+                        return obtenerTodosTecnicos();
+                } else if ("ADMIN_COO".equals(cargoAdmin)) {
+                        // Admin Coobrador ve solo coobradores
+                        return obtenerTodosCoobradores();
+                }
+                return List.of();
         }
 }

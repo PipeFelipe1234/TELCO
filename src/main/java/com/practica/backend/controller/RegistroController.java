@@ -1,6 +1,7 @@
 package com.practica.backend.controller;
 
 import com.practica.backend.dto.ExportRequest;
+import com.practica.backend.dto.AgregarReporteRequest;
 import com.practica.backend.dto.MarcarEntradaRequest;
 import com.practica.backend.dto.MarcarSalidaRequest;
 import com.practica.backend.dto.RegistroResponse;
@@ -77,6 +78,18 @@ public class RegistroController {
                         logger.error("❌ Error en marcarSalida: {}", e.getMessage(), e);
                         throw e;
                 }
+        }
+
+        @PostMapping("/reporte")
+        public ResponseEntity<RegistroResponse> agregarReporte(
+                        @RequestBody AgregarReporteRequest request) {
+                String identificacion = SecurityContextHolder.getContext()
+                                .getAuthentication()
+                                .getName();
+
+                Usuario usuario = usuarioService.obtenerPorIdentificacion(identificacion);
+
+                return ResponseEntity.ok(registroService.agregarReporte(usuario, request));
         }
 
         @GetMapping("/mis-registros")
