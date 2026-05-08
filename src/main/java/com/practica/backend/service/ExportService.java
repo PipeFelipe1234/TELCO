@@ -61,6 +61,7 @@ public class ExportService {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter TIME_AM_PM_FORMATTER = DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH);
     private static final Locale LOCALE_ES = new Locale("es", "ES");
 
     // Encabezados de las 10 columnas
@@ -113,21 +114,21 @@ public class ExportService {
             return "---";
         }
 
-        return fechaHoraColombia.toLocalTime().format(TIME_FORMATTER);
+        return fechaHoraColombia.toLocalTime().format(TIME_AM_PM_FORMATTER).toLowerCase();
     }
 
     /**
-     * Convierte fecha/hora de un reporte a zona Colombia.
+     * Convierte fecha/hora de un reporte a hora Colombia para mostrar en
+     * exportación.
      */
-    private String formatReporteFechaHora(LocalDateTime fechaHora) {
+    private String formatReporteHora(LocalDateTime fechaHora) {
         if (fechaHora == null) {
             return "---";
         }
 
         ZonedDateTime fechaHoraServidor = fechaHora.atZone(ZoneId.systemDefault());
         ZonedDateTime fechaHoraColombia = fechaHoraServidor.withZoneSameInstant(ZONA_COLOMBIA);
-        return fechaHoraColombia.toLocalDate().format(DATE_FORMATTER) + " "
-                + fechaHoraColombia.toLocalTime().format(TIME_FORMATTER);
+        return fechaHoraColombia.toLocalTime().format(TIME_AM_PM_FORMATTER).toLowerCase();
     }
 
     /**
@@ -180,7 +181,7 @@ public class ExportService {
         List<String> lineas = new ArrayList<>();
         int orden = 1;
         for (RegistroReporte reporte : reportes) {
-            String linea = orden + ") " + formatReporteFechaHora(reporte.getFechaHora())
+            String linea = "* " + orden + ") Hora: " + formatReporteHora(reporte.getFechaHora())
                     + " | Texto: " + valorOGuion(reporte.getReporte())
                     + " | Foto: " + (reporte.getPicture() != null && !reporte.getPicture().isBlank() ? "Sí" : "No")
                     + " | Ubicación: " + valorOGuion(reporte.getUbicacion());
