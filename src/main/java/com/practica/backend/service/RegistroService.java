@@ -131,8 +131,6 @@ public class RegistroService {
         registro.setLatitud(request.latitud());
         registro.setLongitud(request.longitud());
         registro.setPrecisionMetros(request.precisionMetros());
-        registro.setReporte(request.reporte());
-        registro.setPicture(request.picture());
 
         // 📍 Reverse geocoding: si el frontend envía ubicación la usamos, si no,
         // llamamos a Google API
@@ -143,17 +141,6 @@ public class RegistroService {
                     request.longitud());
         }
         registro.setUbicacionSalida(ubicacionSalida);
-
-        crearReporteTurno(
-                registro,
-                request.latitud(),
-                request.longitud(),
-                request.precisionMetros(),
-                request.reporte(),
-                request.picture(),
-                ubicacionSalida,
-                fechaHoraRegistro != null ? fechaHoraRegistro : LocalDateTime.now(),
-                true);
 
         // ⏱️ Calcular horas trabajadas considerando que pueden ser días diferentes
         LocalDateTime fechaHoraEntrada = LocalDateTime.of(registro.getFecha(), registro.getHoraEntrada());
