@@ -225,6 +225,40 @@ public class RegistroService {
                 .toList();
     }
 
+    /**
+     * Obtiene todos los registros filtrados según el cargo del admin autenticado:
+     * - ADMIN ve todos los registros
+     * - ADMIN_TEC ve solo registros de usuarios con cargo USER_TEC
+     * - ADMIN_COO ve solo registros de usuarios con cargo USER_COO
+     */
+    public List<RegistroResponse> obtenerTodosFiltrados(String cargoAdmin) {
+        List<Registro> registros = registroRepository.findAll();
+
+        if (cargoAdmin == null || cargoAdmin.trim().isEmpty()) {
+            return registros.stream().map(this::mapToResponse).toList();
+        }
+
+        if ("ADMIN".equals(cargoAdmin)) {
+            return registros.stream().map(this::mapToResponse).toList();
+        }
+
+        if ("ADMIN_TEC".equals(cargoAdmin)) {
+            return registros.stream()
+                    .filter(r -> "USER_TEC".equals(r.getUsuario().getCargo()))
+                    .map(this::mapToResponse)
+                    .toList();
+        }
+
+        if ("ADMIN_COO".equals(cargoAdmin)) {
+            return registros.stream()
+                    .filter(r -> "USER_COO".equals(r.getUsuario().getCargo()))
+                    .map(this::mapToResponse)
+                    .toList();
+        }
+
+        return new ArrayList<>();
+    }
+
     // � FILTRAR REGISTROS CON CRITERIOS PERSONALIZADOS
     public List<RegistroResponse> filtrarRegistros(RegistroFilterRequest filtro) {
         return registroRepository.findByFiltros(
@@ -234,6 +268,36 @@ public class RegistroService {
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
+    }
+
+    /**
+     * Filtrar registros con criterios personalizados y filtrado por cargo del admin
+     */
+    public List<RegistroResponse> filtrarRegistrosFiltrados(RegistroFilterRequest filtro, String cargoAdmin) {
+        List<Registro> registros = registroRepository.findByFiltros(
+                filtro.getFecha(),
+                filtro.getIdentificacion(),
+                filtro.getNombres());
+
+        if (cargoAdmin == null || cargoAdmin.trim().isEmpty() || "ADMIN".equals(cargoAdmin)) {
+            return registros.stream().map(this::mapToResponse).toList();
+        }
+
+        if ("ADMIN_TEC".equals(cargoAdmin)) {
+            return registros.stream()
+                    .filter(r -> "USER_TEC".equals(r.getUsuario().getCargo()))
+                    .map(this::mapToResponse)
+                    .toList();
+        }
+
+        if ("ADMIN_COO".equals(cargoAdmin)) {
+            return registros.stream()
+                    .filter(r -> "USER_COO".equals(r.getUsuario().getCargo()))
+                    .map(this::mapToResponse)
+                    .toList();
+        }
+
+        return new ArrayList<>();
     }
 
     // 🔁 Mapper centralizado

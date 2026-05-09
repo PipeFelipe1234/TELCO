@@ -59,7 +59,12 @@ public class AdminController {
     // 👮 VER TODOS LOS REGISTROS
     @GetMapping("/registros")
     public ResponseEntity<?> todosLosRegistros() {
-        return ResponseEntity.ok(registroService.obtenerTodos());
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
+
+        logger.info("👮 Admin con cargo {} consultando registros", cargoAdmin);
+        return ResponseEntity.ok(registroService.obtenerTodosFiltrados(cargoAdmin));
     }
 
     // 👮 VER TODOS LOS USUARIOS
@@ -90,7 +95,12 @@ public class AdminController {
     // �🔍 FILTRAR REGISTROS POR FECHA, IDENTIFICACIÓN O NOMBRES
     @PostMapping("/registros/filtrar")
     public ResponseEntity<?> filtrarRegistros(@RequestBody RegistroFilterRequest filtro) {
-        return ResponseEntity.ok(registroService.filtrarRegistros(filtro));
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
+
+        logger.info("🔍 Admin con cargo {} filtrando registros", cargoAdmin);
+        return ResponseEntity.ok(registroService.filtrarRegistrosFiltrados(filtro, cargoAdmin));
     }
 
     // ============================
