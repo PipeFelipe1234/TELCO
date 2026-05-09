@@ -227,78 +227,69 @@ public class RegistroService {
     }
 
     /**
-     * Obtiene todos los registros filtrados según el cargo del admin autenticado:
-     * - ADMIN ve todos los registros
-     * - ADMIN_TEC ve solo registros de usuarios con cargo USER_TEC
-     * - ADMIN_COO ve solo registros de usuarios con cargo USER_COO
+     * Obtiene todos los registros filtrados según el cargo Y las ciudades del
+     * admin.
+     * - ADMIN sin ciudades: ve todo
+     * - ADMIN_TEC: ve solo USER_TEC de sus ciudades asignadas
+     * - ADMIN_COO: ve solo USER_COO de sus ciudades asignadas
      */
-    public List<RegistroResponse> obtenerTodosFiltrados(String cargoAdmin) {
+    public List<RegistroResponse> obtenerTodosFiltrados(Usuario admin) {
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
         List<Registro> registros = registroRepository.findAll();
 
-        if (cargoAdmin == null || cargoAdmin.trim().isEmpty()) {
-            return registros.stream().map(this::mapToResponse).toList();
-        }
-
-        if ("ADMIN".equals(cargoAdmin)) {
-            return registros.stream().map(this::mapToResponse).toList();
-        }
-
-        if ("ADMIN_TEC".equals(cargoAdmin)) {
-            return registros.stream()
-                    .filter(r -> "USER_TEC".equals(r.getUsuario().getCargo()))
-                    .map(this::mapToResponse)
-                    .toList();
-        }
-
-        if ("ADMIN_COO".equals(cargoAdmin)) {
-            return registros.stream()
-                    .filter(r -> "USER_COO".equals(r.getUsuario().getCargo()))
-                    .map(this::mapToResponse)
-                    .toList();
-        }
-
-        return new ArrayList<>();
-    }
-
-    // � FILTRAR REGISTROS CON CRITERIOS PERSONALIZADOS
-    public List<RegistroResponse> filtrarRegistros(RegistroFilterRequest filtro) {
-        return registroRepository.findByFiltros(
-                filtro.getFecha(),
-                filtro.getIdentificacion(),
-                filtro.getNombres())
-                .stream()
+        return registros.stream()
+                .filter(r -> empleadoVisibleParaAdmin(r, cargoAdmin, admin != null ? admin.getCiudades() : List.of()))
                 .map(this::mapToResponse)
                 .toList();
     }
 
     /**
-     * Filtrar registros con criterios personalizados y filtrado por cargo del admin
+     * Filtrar registros con criterios y filtrado por cargo+ciudades del admin.
      */
-    public List<RegistroResponse> filtrarRegistrosFiltrados(RegistroFilterRequest filtro, String cargoAdmin) {
+    public List<RegistroResponse> filtrarRegistrosFiltrados(RegistroFilterRequest filtro, Usuario admin) {
+        String cargoAdmin = admin != null ? admin.getCargo() : null;
         List<Registro> registros = registroRepository.findByFiltros(
                 filtro.getFecha(),
                 filtro.getIdentificacion(),
                 filtro.getNombres());
 
-        if (cargoAdmin == null || cargoAdmin.trim().isEmpty() || "ADMIN".equals(cargoAdmin)) {
-            return registros.stream().map(this::mapToResponse).toList();
+        return registros.stream()
+                .filter(r -> empleadoVisibleParaAdmin(r, cargoAdmin, admin != null ? admin.getCiudades() : List.of()))
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    /**
+     * Determina si un registro debe ser visible para un admin según su cargo y
+     * ciudades.
+     * - ADMIN (o cargo null): ve todo
+     * - ADMIN_TEC: ve solo USER_TEC en sus ciudades
+     * - ADMIN_COO: ve solo USER_COO en sus ciudades
+     */
+    private boolean empleadoVisibleParaAdmin(Registro r, String cargoAdmin, List<String> ciudadesAdmin) {
+        if (cargoAdmin == null || "ADMIN".equals(cargoAdmin)) {
+            return true;
         }
 
-        if ("ADMIN_TEC".equals(cargoAdmin)) {
-            return registros.stream()
-                    .filter(r -> "USER_TEC".equals(r.getUsuario().getCargo()))
-                    .map(this::mapToResponse)
-                    .toList();
+        Usuario empleado = r.getUsuario();
+        String cargoEsperado = "ADMIN_TEC".equals(cargoAdmin) ? "USER_TEC" : "USER_COO";
+
+        if (!cargoEsperado.equals(empleado.getCargo())) {
+            return false;
         }
 
-        if ("ADMIN_COO".equals(cargoAdmin)) {
-            return registros.stream()
-                    .filter(r -> "USER_COO".equals(r.getUsuario().getCargo()))
-                    .map(this::mapToResponse)
-                    .toList();
+        // Si el admin no tiene ciudades asignadas, ve todos los empleados de su cargo
+        if (ciudadesAdmin == null || ciudadesAdmin.isEmpty()) {
+            return true;
         }
 
-        return new ArrayList<>();
+        // El empleado debe tener al menos una ciudad en común con el admin
+        List<String> ciudadesEmpleado = empleado.getCiudades();
+        if (ciudadesEmpleado == null || ciudadesEmpleado.isEmpty()) {
+            return false;
+        }
+
+        return ciudadesAdmin.stream().anyMatch(ciudadesEmpleado::contains);
     }
 
     // 🔁 Mapper centralizado
@@ -410,7 +401,9 @@ public class RegistroService {
             String mensaje = registro.getUsuario().getNombre() + " marcó Entrada";
 
             notificacionService.enviarNotificacionFiltradaPorCargo(
-                    registro.getUsuario().getCargo(), titulo, mensaje, datos);
+                    registro.getUsuario().getCargo(),
+                    registro.getUsuario().getCiudades(),
+                    titulo, mensaje, datos);
         } catch (Exception e) {
             System.err.println("❌ Error al enviar notificación de entrada: " + e.getMessage());
         }
@@ -430,7 +423,9 @@ public class RegistroService {
             String mensaje = registro.getUsuario().getNombre() + " marcó Salida";
 
             notificacionService.enviarNotificacionFiltradaPorCargo(
-                    registro.getUsuario().getCargo(), titulo, mensaje, datos);
+                    registro.getUsuario().getCargo(),
+                    registro.getUsuario().getCiudades(),
+                    titulo, mensaje, datos);
         } catch (Exception e) {
             System.err.println("❌ Error al enviar notificación de salida: " + e.getMessage());
         }
@@ -452,7 +447,9 @@ public class RegistroService {
             String mensaje = registro.getUsuario().getNombre() + " " + cargo + " envió un reporte";
 
             notificacionService.enviarNotificacionFiltradaPorCargo(
-                    registro.getUsuario().getCargo(), titulo, mensaje, datos);
+                    registro.getUsuario().getCargo(),
+                    registro.getUsuario().getCiudades(),
+                    titulo, mensaje, datos);
         } catch (Exception e) {
             System.err.println("❌ Error al enviar notificación de reporte: " + e.getMessage());
         }

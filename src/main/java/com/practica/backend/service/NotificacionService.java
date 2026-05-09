@@ -75,27 +75,35 @@ public class NotificacionService {
     }
 
     /**
-     * 📲 Envía notificación a los admins que corresponden según el cargo del
+     * 📲 Envía notificación a los admins que corresponden según el cargo Y ciudades
+     * del
      * empleado.
-     * - USER_TEC → ADMIN (super) + ADMIN_TEC
-     * - USER_COO → ADMIN (super) + ADMIN_COO
+     * - USER_TEC → ADMIN (super) + ADMIN_TEC con la ciudad del empleado
+     * - USER_COO → ADMIN (super) + ADMIN_COO con la ciudad del empleado
      * - Cualquier otro → todos los admins
      */
     public void enviarNotificacionFiltradaPorCargo(
             String cargoEmpleado,
+            List<String> ciudadesEmpleado,
             String titulo,
             String mensaje,
             Map<String, String> datos) {
 
         List<Usuario> admins;
         if ("USER_TEC".equals(cargoEmpleado)) {
+            List<Usuario> adminsTec = usuarioRepository.findAllAdminsTecnicos().stream()
+                    .filter(a -> adminCubreEmpleado(a, ciudadesEmpleado))
+                    .toList();
             admins = Stream.concat(
                     usuarioRepository.findAllSuperAdmins().stream(),
-                    usuarioRepository.findAllAdminsTecnicos().stream()).toList();
+                    adminsTec.stream()).toList();
         } else if ("USER_COO".equals(cargoEmpleado)) {
+            List<Usuario> adminsCoo = usuarioRepository.findAllAdminsCoobradores().stream()
+                    .filter(a -> adminCubreEmpleado(a, ciudadesEmpleado))
+                    .toList();
             admins = Stream.concat(
                     usuarioRepository.findAllSuperAdmins().stream(),
-                    usuarioRepository.findAllAdminsCoobradores().stream()).toList();
+                    adminsCoo.stream()).toList();
         } else {
             admins = usuarioRepository.findAllAdmins();
         }
@@ -315,5 +323,22 @@ public class NotificacionService {
                 "mensaje", mensaje);
 
         enviarNotificacionAMultiplesDispositivos(tokenList, titulo, mensaje, datos);
+    }
+
+    /**
+     * Determina si un admin cubre al empleado según las ciudades asignadas al
+     * admin.
+     * Si el admin no tiene ciudades asignadas, cubre a todos los empleados de su
+     * cargo.
+     */
+    private boolean adminCubreEmpleado(Usuario admin, List<String> ciudadesEmpleado) {
+        List<String> ciudadesAdmin = admin.getCiudades();
+        if (ciudadesAdmin == null || ciudadesAdmin.isEmpty()) {
+            return true; // Admin sin ciudades ve todo
+        }
+        if (ciudadesEmpleado == null || ciudadesEmpleado.isEmpty()) {
+            return false; // Empleado sin ciudad no es cubierto por admin con ciudad
+        }
+        return ciudadesAdmin.stream().anyMatch(ciudadesEmpleado::contains);
     }
 }

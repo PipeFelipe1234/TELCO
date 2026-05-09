@@ -665,18 +665,34 @@ public class RastreoZonaService {
      * - Si el usuario tiene cargo USER_COO → envía a ADMIN + ADMIN_COO
      */
     private List<Usuario> obtenerAdminsParaNotificacion(Usuario empleado) {
+        List<String> ciudadesEmpleado = empleado.getCiudades();
+
         if ("USER_TEC".equals(empleado.getCargo())) {
-            // Usuario técnico: notificar a SUPER ADMIN + ADMIN_TEC
-            List<Usuario> admins = usuarioRepository.findAllSuperAdmins();
-            admins.addAll(usuarioRepository.findAllAdminsTecnicos());
-            return admins;
+            List<Usuario> adminsTec = usuarioRepository.findAllAdminsTecnicos().stream()
+                    .filter(a -> adminCubreEmpleado(a, ciudadesEmpleado))
+                    .toList();
+            List<Usuario> result = new java.util.ArrayList<>(usuarioRepository.findAllSuperAdmins());
+            result.addAll(adminsTec);
+            return result;
         } else if ("USER_COO".equals(empleado.getCargo())) {
-            // Usuario coobrador: notificar a SUPER ADMIN + ADMIN_COO
-            List<Usuario> admins = usuarioRepository.findAllSuperAdmins();
-            admins.addAll(usuarioRepository.findAllAdminsCoobradores());
-            return admins;
+            List<Usuario> adminsCoo = usuarioRepository.findAllAdminsCoobradores().stream()
+                    .filter(a -> adminCubreEmpleado(a, ciudadesEmpleado))
+                    .toList();
+            List<Usuario> result = new java.util.ArrayList<>(usuarioRepository.findAllSuperAdmins());
+            result.addAll(adminsCoo);
+            return result;
         }
-        // Si no es USER, devolver todos los admins
         return usuarioRepository.findAllAdmins();
+    }
+
+    private boolean adminCubreEmpleado(Usuario admin, List<String> ciudadesEmpleado) {
+        List<String> ciudadesAdmin = admin.getCiudades();
+        if (ciudadesAdmin == null || ciudadesAdmin.isEmpty()) {
+            return true;
+        }
+        if (ciudadesEmpleado == null || ciudadesEmpleado.isEmpty()) {
+            return false;
+        }
+        return ciudadesAdmin.stream().anyMatch(ciudadesEmpleado::contains);
     }
 }
