@@ -59,7 +59,13 @@ public class AdminController {
     // 👮 VER TODOS LOS REGISTROS
     @GetMapping("/registros")
     public ResponseEntity<?> todosLosRegistros() {
-        return ResponseEntity.ok(registroService.obtenerTodos());
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+
+        logger.info("👮 Admin con cargo {} y ciudades {} consultando registros",
+                admin != null ? admin.getCargo() : null,
+                admin != null ? admin.getCiudades() : null);
+        return ResponseEntity.ok(registroService.obtenerTodosFiltrados(admin));
     }
 
     // 👮 VER TODOS LOS USUARIOS
@@ -67,10 +73,11 @@ public class AdminController {
     public ResponseEntity<?> todosLosUsuarios() {
         String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
         Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
-        String cargoAdmin = admin != null ? admin.getCargo() : null;
 
-        logger.info("👮 Admin con cargo {} consultando listado de usuarios", cargoAdmin);
-        return ResponseEntity.ok(usuarioService.obtenerTodosFiltrados(cargoAdmin));
+        logger.info("👮 Admin con cargo {} y ciudades {} consultando listado de usuarios",
+                admin != null ? admin.getCargo() : null,
+                admin != null ? admin.getCiudades() : null);
+        return ResponseEntity.ok(usuarioService.obtenerTodosFiltrados(admin));
     }
 
     // 👮 VER UN USUARIO ESPECÍFICO POR ID
@@ -90,7 +97,11 @@ public class AdminController {
     // �🔍 FILTRAR REGISTROS POR FECHA, IDENTIFICACIÓN O NOMBRES
     @PostMapping("/registros/filtrar")
     public ResponseEntity<?> filtrarRegistros(@RequestBody RegistroFilterRequest filtro) {
-        return ResponseEntity.ok(registroService.filtrarRegistros(filtro));
+        String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
+        Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
+
+        logger.info("🔍 Admin con cargo {} filtrando registros", admin != null ? admin.getCargo() : null);
+        return ResponseEntity.ok(registroService.filtrarRegistrosFiltrados(filtro, admin));
     }
 
     // ============================

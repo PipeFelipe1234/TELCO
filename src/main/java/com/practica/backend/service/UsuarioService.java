@@ -30,6 +30,19 @@ public class UsuarioService {
                 this.zonaRepository = zonaRepository;
         }
 
+        private UsuarioResponse toResponse(Usuario u) {
+                return new UsuarioResponse(
+                                u.getId(),
+                                u.getIdentificacion(),
+                                u.getNombre(),
+                                u.getEmail(),
+                                u.getRol(),
+                                u.getFoto(),
+                                u.getTelefono(),
+                                u.getCargo(),
+                                u.getCiudades());
+        }
+
         public UsuarioResponse crearUsuario(UsuarioRequest request) {
 
                 if (usuarioRepository.findByIdentificacion(request.identificacion()).isPresent()) {
@@ -44,18 +57,11 @@ public class UsuarioService {
                 usuario.setFoto(request.foto());
                 usuario.setTelefono(request.telefono());
                 usuario.setCargo(request.cargo());
+                usuario.setCiudades(request.ciudades());
 
                 Usuario guardado = usuarioRepository.save(usuario);
 
-                return new UsuarioResponse(
-                                guardado.getId(),
-                                guardado.getIdentificacion(),
-                                guardado.getNombre(),
-                                guardado.getEmail(),
-                                guardado.getRol(),
-                                guardado.getFoto(),
-                                guardado.getTelefono(),
-                                guardado.getCargo());
+                return toResponse(guardado);
         }
 
         public UsuarioResponse actualizarUsuario(Long id, UsuarioRequest request) {
@@ -69,18 +75,11 @@ public class UsuarioService {
                 usuario.setFoto(request.foto());
                 usuario.setTelefono(request.telefono());
                 usuario.setCargo(request.cargo());
+                usuario.setCiudades(request.ciudades());
 
                 Usuario actualizado = usuarioRepository.save(usuario);
 
-                return new UsuarioResponse(
-                                actualizado.getId(),
-                                actualizado.getIdentificacion(),
-                                actualizado.getNombre(),
-                                actualizado.getEmail(),
-                                actualizado.getRol(),
-                                actualizado.getFoto(),
-                                actualizado.getTelefono(),
-                                actualizado.getCargo());
+                return toResponse(actualizado);
         }
 
         public Usuario obtenerPorId(Long id) {
@@ -90,15 +89,7 @@ public class UsuarioService {
         public UsuarioResponse obtenerUsuarioResponsePorId(Long id) {
                 Usuario u = usuarioRepository.findById(id)
                                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-                return new UsuarioResponse(
-                                u.getId(),
-                                u.getIdentificacion(),
-                                u.getNombre(),
-                                u.getEmail(),
-                                u.getRol(),
-                                u.getFoto(),
-                                u.getTelefono(),
-                                u.getCargo());
+                return toResponse(u);
         }
 
         public Usuario obtenerPorIdentificacion(String identificacion) {
@@ -109,15 +100,7 @@ public class UsuarioService {
         public UsuarioResponse obtenerUsuarioResponsePorIdentificacion(String identificacion) {
                 Usuario u = usuarioRepository.findByIdentificacion(identificacion)
                                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
-                return new UsuarioResponse(
-                                u.getId(),
-                                u.getIdentificacion(),
-                                u.getNombre(),
-                                u.getEmail(),
-                                u.getRol(),
-                                u.getFoto(),
-                                u.getTelefono(),
-                                u.getCargo());
+                return toResponse(u);
         }
 
         public UsuarioResponse actualizarPorIdentificacion(String identificacion, UsuarioRequest request) {
@@ -131,77 +114,57 @@ public class UsuarioService {
                 usuario.setFoto(request.foto());
                 usuario.setTelefono(request.telefono());
                 usuario.setCargo(request.cargo());
+                usuario.setCiudades(request.ciudades());
 
                 Usuario actualizado = usuarioRepository.save(usuario);
 
-                return new UsuarioResponse(
-                                actualizado.getId(),
-                                actualizado.getIdentificacion(),
-                                actualizado.getNombre(),
-                                actualizado.getEmail(),
-                                actualizado.getRol(),
-                                actualizado.getFoto(),
-                                actualizado.getTelefono(),
-                                actualizado.getCargo());
+                return toResponse(actualizado);
         }
 
         public List<UsuarioResponse> obtenerTodos() {
                 return usuarioRepository.findAll()
                                 .stream()
-                                .map(u -> new UsuarioResponse(
-                                                u.getId(),
-                                                u.getIdentificacion(),
-                                                u.getNombre(),
-                                                u.getEmail(),
-                                                u.getRol(),
-                                                u.getFoto(),
-                                                u.getTelefono(),
-                                                u.getCargo()))
+                                .map(this::toResponse)
                                 .toList();
         }
 
         /**
-         * Filtra usuarios (sin zonas) según el cargo del admin autenticado.
+         * Filtra usuarios según el cargo Y las ciudades del admin autenticado.
          * - ADMIN o null: ve todos
-         * - ADMIN_TEC: ve solo usuarios con cargo USER_TEC
-         * - ADMIN_COO: ve solo usuarios con cargo USER_COO
+         * - ADMIN_TEC: ve solo usuarios con cargo USER_TEC en sus ciudades
+         * - ADMIN_COO: ve solo usuarios con cargo USER_COO en sus ciudades
          */
-        public List<UsuarioResponse> obtenerTodosFiltrados(String cargoAdmin) {
+        public List<UsuarioResponse> obtenerTodosFiltrados(Usuario admin) {
+                String cargoAdmin = admin != null ? admin.getCargo() : null;
+                List<String> ciudadesAdmin = admin != null ? admin.getCiudades() : List.of();
+
                 if (cargoAdmin == null || "ADMIN".equals(cargoAdmin)) {
                         return obtenerTodos();
                 }
 
-                if ("ADMIN_TEC".equals(cargoAdmin)) {
-                        return usuarioRepository.findAllTecnicos()
-                                        .stream()
-                                        .map(u -> new UsuarioResponse(
-                                                        u.getId(),
-                                                        u.getIdentificacion(),
-                                                        u.getNombre(),
-                                                        u.getEmail(),
-                                                        u.getRol(),
-                                                        u.getFoto(),
-                                                        u.getTelefono(),
-                                                        u.getCargo()))
-                                        .toList();
-                }
+                String cargoEsperado = "ADMIN_TEC".equals(cargoAdmin) ? "USER_TEC" : "USER_COO";
 
-                if ("ADMIN_COO".equals(cargoAdmin)) {
-                        return usuarioRepository.findAllCoobradores()
-                                        .stream()
-                                        .map(u -> new UsuarioResponse(
-                                                        u.getId(),
-                                                        u.getIdentificacion(),
-                                                        u.getNombre(),
-                                                        u.getEmail(),
-                                                        u.getRol(),
-                                                        u.getFoto(),
-                                                        u.getTelefono(),
-                                                        u.getCargo()))
-                                        .toList();
-                }
+                return usuarioRepository.findAll().stream()
+                                .filter(u -> cargoEsperado.equals(u.getCargo()))
+                                .filter(u -> usuarioEnCiudades(u, ciudadesAdmin))
+                                .map(this::toResponse)
+                                .toList();
+        }
 
-                return List.of();
+        /**
+         * Retorna true si el usuario pertenece a al menos una de las ciudades del
+         * admin.
+         * Si el admin no tiene ciudades, ve todos los usuarios de su cargo.
+         */
+        private boolean usuarioEnCiudades(Usuario usuario, List<String> ciudadesAdmin) {
+                if (ciudadesAdmin == null || ciudadesAdmin.isEmpty()) {
+                        return true;
+                }
+                List<String> ciudadesUsuario = usuario.getCiudades();
+                if (ciudadesUsuario == null || ciudadesUsuario.isEmpty()) {
+                        return false;
+                }
+                return ciudadesAdmin.stream().anyMatch(ciudadesUsuario::contains);
         }
 
         /**
@@ -243,18 +206,13 @@ public class UsuarioService {
                 if (request.cargo() != null) {
                         usuario.setCargo(request.cargo());
                 }
+                if (request.ciudades() != null) {
+                        usuario.setCiudades(request.ciudades());
+                }
 
                 Usuario actualizado = usuarioRepository.save(usuario);
 
-                return new UsuarioResponse(
-                                actualizado.getId(),
-                                actualizado.getIdentificacion(),
-                                actualizado.getNombre(),
-                                actualizado.getEmail(),
-                                actualizado.getRol(),
-                                actualizado.getFoto(),
-                                actualizado.getTelefono(),
-                                actualizado.getCargo());
+                return toResponse(actualizado);
         }
 
         // ============================

@@ -2,17 +2,19 @@ package com.practica.backend.dto;
 
 import com.practica.backend.security.ValidPhoneNumber;
 import jakarta.validation.constraints.Email;
+import java.util.List;
 
 /**
  * Request para actualizar un usuario parcialmente.
  * Todos los campos son opcionales - solo se actualizan los que se envían.
  */
 public record UsuarioUpdateRequest(
-        String identificacion,
-        String nombre,
-        @Email String email,
-        String rol,
-        String foto,
-        @ValidPhoneNumber String telefono,
-        String cargo) {
+                String identificacion,
+                String nombre,
+                @Email String email,
+                String rol,
+                String foto,
+                @ValidPhoneNumber String telefono,
+                String cargo,
+                List<String> ciudades) {
 }

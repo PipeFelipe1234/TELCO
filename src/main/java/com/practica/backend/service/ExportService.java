@@ -10,7 +10,9 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.practica.backend.dto.ExportRequest;
 import com.practica.backend.entity.Registro;
+import com.practica.backend.entity.RegistroReporte;
 import com.practica.backend.entity.Usuario;
+import com.practica.backend.repository.RegistroReporteRepository;
 import com.practica.backend.repository.RegistroRepository;
 import com.practica.backend.repository.UsuarioRepository;
 import org.apache.poi.ss.usermodel.BorderStyle;
@@ -41,6 +43,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -50,17 +53,15 @@ import java.util.stream.Collectors;
 public class ExportService {
 
     private final RegistroRepository registroRepository;
+    private final RegistroReporteRepository registroReporteRepository;
     private final UsuarioRepository usuarioRepository;
 
     // Zona horaria de Colombia
     private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
 
-    // Fecha de corte: 1 de marzo de 2026 a las 00:00:00 hora Colombia
-    private static final ZonedDateTime FECHA_CORTE = ZonedDateTime.of(
-            2026, 3, 1, 0, 0, 0, 0, ZONA_COLOMBIA);
-
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter TIME_AM_PM_FORMATTER = DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH);
     private static final Locale LOCALE_ES = new Locale("es", "ES");
 
     // Encabezados de las 10 columnas
@@ -70,8 +71,11 @@ public class ExportService {
             "Reporte", "Foto", "Horas Trabajadas"
     };
 
-    public ExportService(RegistroRepository registroRepository, UsuarioRepository usuarioRepository) {
+    public ExportService(RegistroRepository registroRepository,
+            RegistroReporteRepository registroReporteRepository,
+            UsuarioRepository usuarioRepository) {
         this.registroRepository = registroRepository;
+        this.registroReporteRepository = registroReporteRepository;
         this.usuarioRepository = usuarioRepository;
     }
 
@@ -90,57 +94,74 @@ public class ExportService {
     // ============================
 
     /**
-     * Convierte una hora según la lógica de zona horaria:
-     * - Antes del corte (1 marzo 2026): la hora está en UTC, restar 5 horas
-     * - En o después del corte: la hora ya está en Colombia, no convertir
+     * Convierte fecha y hora desde la zona del servidor a hora Colombia.
+     */
+    private ZonedDateTime toColombia(LocalDate fecha, LocalTime hora) {
+        if (fecha == null || hora == null) {
+            return null;
+        }
+
+        ZonedDateTime fechaHoraServidor = ZonedDateTime.of(fecha, hora, ZoneId.systemDefault());
+        return fechaHoraServidor.withZoneSameInstant(ZONA_COLOMBIA);
+    }
+
+    /**
+     * Convierte una hora a zona Colombia para mostrar en exportación.
      */
     private String formatTimeWithTimezone(LocalDate fechaRegistro, LocalTime horaOriginal) {
-        if (horaOriginal == null) {
+        ZonedDateTime fechaHoraColombia = toColombia(fechaRegistro, horaOriginal);
+        if (fechaHoraColombia == null) {
             return "---";
         }
 
-        // Crear ZonedDateTime de la fecha del registro en UTC
-        ZonedDateTime fechaRegistroUtc = ZonedDateTime.of(
-                fechaRegistro, LocalTime.MIDNIGHT, ZoneId.of("UTC"));
+        return fechaHoraColombia.toLocalTime().format(TIME_AM_PM_FORMATTER).toLowerCase();
+    }
 
-        if (fechaRegistroUtc.isBefore(FECHA_CORTE)) {
-            // Antes del corte: la hora está en UTC, restar 5 horas
-            LocalTime horaConvertida = horaOriginal.minusHours(5);
-            return horaConvertida.format(TIME_FORMATTER);
-        } else {
-            // Después del corte: la hora ya está en Colombia
-            return horaOriginal.format(TIME_FORMATTER);
+    /**
+     * Convierte fecha/hora de un reporte a hora Colombia para mostrar en
+     * exportación.
+     */
+    private String formatReporteHora(LocalDateTime fechaHora) {
+        if (fechaHora == null) {
+            return "---";
         }
+
+        ZonedDateTime fechaHoraServidor = fechaHora.atZone(ZoneId.systemDefault());
+        ZonedDateTime fechaHoraColombia = fechaHoraServidor.withZoneSameInstant(ZONA_COLOMBIA);
+        return fechaHoraColombia.toLocalTime().format(TIME_AM_PM_FORMATTER).toLowerCase();
+    }
+
+    /**
+     * Obtiene fecha local Colombia para mostrar por registro (base: hora entrada).
+     */
+    private String formatDateWithTimezone(Registro registro) {
+        ZonedDateTime fechaHoraColombia = toColombia(registro.getFecha(), registro.getHoraEntrada());
+        if (fechaHoraColombia == null) {
+            return registro.getFecha() != null ? registro.getFecha().format(DATE_FORMATTER) : "---";
+        }
+        return fechaHoraColombia.toLocalDate().format(DATE_FORMATTER);
     }
 
     /**
      * Calcula las horas trabajadas considerando la zona horaria
      */
     private String calcularHorasTrabajadas(Registro registro) {
+        if (registro.getHorasTrabajadas() != null && registro.getMinutosTrabajados() != null) {
+            int minutos = registro.getMinutosTrabajados() % 60;
+            return registro.getHorasTrabajadas() + "h " + minutos + "m";
+        }
+
         if (registro.getHoraSalida() == null) {
             return "---";
         }
 
-        LocalTime horaEntrada = registro.getHoraEntrada();
-        LocalTime horaSalida = registro.getHoraSalida();
-        LocalDate fechaRegistro = registro.getFecha();
-
-        // Crear ZonedDateTime para comparar con fecha de corte
-        ZonedDateTime fechaRegistroUtc = ZonedDateTime.of(
-                fechaRegistro, LocalTime.MIDNIGHT, ZoneId.of("UTC"));
-
-        if (fechaRegistroUtc.isBefore(FECHA_CORTE)) {
-            // Antes del corte: convertir ambas horas de UTC a Colombia
-            horaEntrada = horaEntrada.minusHours(5);
-            horaSalida = horaSalida.minusHours(5);
+        ZonedDateTime fechaHoraEntrada = toColombia(registro.getFecha(), registro.getHoraEntrada());
+        ZonedDateTime fechaHoraSalida = toColombia(registro.getFecha(), registro.getHoraSalida());
+        if (fechaHoraEntrada == null || fechaHoraSalida == null) {
+            return "---";
         }
 
-        // Calcular duración
-        LocalDateTime fechaHoraEntrada = LocalDateTime.of(fechaRegistro, horaEntrada);
-        LocalDateTime fechaHoraSalida = LocalDateTime.of(fechaRegistro, horaSalida);
-
-        // Si la salida es antes de la entrada, asumimos que pasó medianoche
-        if (horaSalida.isBefore(horaEntrada)) {
+        if (fechaHoraSalida.isBefore(fechaHoraEntrada)) {
             fechaHoraSalida = fechaHoraSalida.plusDays(1);
         }
 
@@ -149,6 +170,39 @@ public class ExportService {
         long minutos = duracion.toMinutes() % 60;
 
         return horas + "h " + minutos + "m";
+    }
+
+    private String construirDetalleReportes(Registro registro) {
+        List<RegistroReporte> reportes = registroReporteRepository.findByRegistroOrderByFechaHoraAsc(registro);
+        if (reportes.isEmpty()) {
+            return valorOGuion(registro.getReporte());
+        }
+
+        List<String> lineas = new ArrayList<>();
+        int orden = 1;
+        for (RegistroReporte reporte : reportes) {
+            String linea = "* " + orden + ") Hora: " + formatReporteHora(reporte.getFechaHora())
+                    + " | Texto: " + valorOGuion(reporte.getReporte())
+                    + " | Foto: " + (reporte.getPicture() != null && !reporte.getPicture().isBlank() ? "Sí" : "No")
+                    + " | Ubicación: " + valorOGuion(reporte.getUbicacion());
+            lineas.add(linea);
+            orden++;
+        }
+
+        return String.join("\n", lineas);
+    }
+
+    private String tieneFotoEnTurno(Registro registro) {
+        if (registro.getPicture() != null && !registro.getPicture().isBlank()) {
+            return "Sí";
+        }
+
+        boolean existeFotoEnReportes = registroReporteRepository
+                .findByRegistroOrderByFechaHoraAsc(registro)
+                .stream()
+                .anyMatch(r -> r.getPicture() != null && !r.getPicture().isBlank());
+
+        return existeFotoEnReportes ? "Sí" : "No";
     }
 
     // ============================
@@ -338,7 +392,8 @@ public class ExportService {
         document.add(titleParagraph);
 
         // Fecha de generación
-        Paragraph fecha = new Paragraph("Generado el: " + LocalDate.now().format(DATE_FORMATTER), subtitleFont);
+        Paragraph fecha = new Paragraph("Generado el: " + LocalDate.now(ZONA_COLOMBIA).format(DATE_FORMATTER),
+                subtitleFont);
         fecha.setAlignment(Element.ALIGN_CENTER);
         fecha.setSpacingAfter(15);
         document.add(fecha);
@@ -363,7 +418,7 @@ public class ExportService {
         // Datos
         for (Registro registro : registros) {
             // 1. Fecha
-            addPdfCell(table, registro.getFecha().format(DATE_FORMATTER), dataFont, Element.ALIGN_CENTER);
+            addPdfCell(table, formatDateWithTimezone(registro), dataFont, Element.ALIGN_CENTER);
 
             // 2. Identificación
             addPdfCell(table, registro.getUsuario().getIdentificacion(), dataFont, Element.ALIGN_CENTER);
@@ -386,10 +441,10 @@ public class ExportService {
             addPdfCell(table, valorOGuion(registro.getUbicacionSalida()), dataFont, Element.ALIGN_LEFT);
 
             // 8. Reporte
-            addPdfCell(table, valorOGuion(registro.getReporte()), dataFont, Element.ALIGN_LEFT);
+            addPdfCell(table, construirDetalleReportes(registro), dataFont, Element.ALIGN_LEFT);
 
             // 9. Foto
-            addPdfCell(table, registro.getPicture() != null && !registro.getPicture().isEmpty() ? "Sí" : "No",
+            addPdfCell(table, tieneFotoEnTurno(registro),
                     dataFont, Element.ALIGN_CENTER);
 
             // 10. Horas Trabajadas
@@ -468,7 +523,7 @@ public class ExportService {
             // Fecha de generación
             org.apache.poi.ss.usermodel.Row subtitleRow = sheet.createRow(1);
             org.apache.poi.ss.usermodel.Cell subtitleCell = subtitleRow.createCell(0);
-            subtitleCell.setCellValue("Generado el: " + LocalDate.now().format(DATE_FORMATTER));
+            subtitleCell.setCellValue("Generado el: " + LocalDate.now(ZONA_COLOMBIA).format(DATE_FORMATTER));
             sheet.addMergedRegion(new CellRangeAddress(1, 1, 0, 9));
 
             // Encabezados (fila 3, índice 2)
@@ -485,7 +540,7 @@ public class ExportService {
                 org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowNum++);
 
                 // 1. Fecha
-                createExcelCell(row, 0, registro.getFecha().format(DATE_FORMATTER), dataCenterStyle);
+                createExcelCell(row, 0, formatDateWithTimezone(registro), dataCenterStyle);
 
                 // 2. Identificación
                 createExcelCell(row, 1, registro.getUsuario().getIdentificacion(), dataCenterStyle);
@@ -508,10 +563,10 @@ public class ExportService {
                 createExcelCell(row, 6, valorOGuion(registro.getUbicacionSalida()), dataStyle);
 
                 // 8. Reporte
-                createExcelCell(row, 7, valorOGuion(registro.getReporte()), dataStyle);
+                createExcelCell(row, 7, construirDetalleReportes(registro), dataStyle);
 
                 // 9. Foto
-                createExcelCell(row, 8, registro.getPicture() != null && !registro.getPicture().isEmpty() ? "Sí" : "No",
+                createExcelCell(row, 8, tieneFotoEnTurno(registro),
                         dataCenterStyle);
 
                 // 10. Horas Trabajadas
