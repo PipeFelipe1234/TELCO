@@ -81,6 +81,24 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
         @Query("SELECT MIN(r.fecha) FROM Registro r")
         LocalDate findFechaMasAntigua();
 
+        // � DASHBOARD: suma de minutos trabajados agrupada por usuario en un rango
+        @Query("SELECT r.usuario.id, r.usuario.nombre, SUM(r.minutosTrabajados), COUNT(r) " +
+                        "FROM Registro r " +
+                        "WHERE r.fecha >= :inicio AND r.fecha <= :fin AND r.horaSalida IS NOT NULL " +
+                        "GROUP BY r.usuario.id, r.usuario.nombre " +
+                        "ORDER BY SUM(r.minutosTrabajados) DESC")
+        List<Object[]> sumMinutosByUsuarioInRange(
+                        @Param("inicio") LocalDate inicio,
+                        @Param("fin") LocalDate fin);
+
+        // 📊 DASHBOARD: cantidad de registros por día en un rango (asistencia diaria)
+        @Query("SELECT r.fecha, COUNT(r) FROM Registro r " +
+                        "WHERE r.fecha >= :inicio AND r.fecha <= :fin " +
+                        "GROUP BY r.fecha ORDER BY r.fecha ASC")
+        List<Object[]> countRegistrosByFechaInRange(
+                        @Param("inicio") LocalDate inicio,
+                        @Param("fin") LocalDate fin);
+
         // 📍 OBTENER TODOS LOS REGISTROS EN TURNO (empleados con entrada pero sin
         // salida)
         @Query("SELECT r FROM Registro r WHERE r.horaSalida IS NULL ORDER BY r.fecha DESC, r.horaEntrada DESC")
