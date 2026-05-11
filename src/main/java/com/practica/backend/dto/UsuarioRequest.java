@@ -6,12 +6,13 @@ import com.practica.backend.security.ValidPhoneNumber;
 import java.util.List;
 
 public record UsuarioRequest(
-        @NotBlank String identificacion,
-        @NotBlank String nombre,
-        @Email String email,
-        @NotBlank String rol,
-        String foto,
-        @ValidPhoneNumber String telefono,
-        String cargo,
-        List<String> ciudades) {
+                @NotBlank String identificacion,
+                @NotBlank String nombre,
+                @Email String email,
+                @NotBlank String rol,
+                String foto,
+                @ValidPhoneNumber String telefono,
+                String cargo,
+                List<String> ciudades,
+                Integer tiempoLimiteMinutos) {
 }

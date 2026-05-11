@@ -45,6 +45,14 @@ public class Usuario {
     private String ciudades;
 
     /**
+     * Tiempo límite en minutos que el empleado puede permanecer en el mismo punto.
+     * Configurable por administración. Si es null, se considera sin límite.
+     * Verde: 0%–70% del límite. Amarillo: 70%–100%. Rojo: más del 100%.
+     */
+    @Column(name = "tiempo_limite_minutos")
+    private Integer tiempoLimiteMinutos;
+
+    /**
      * Zonas asignadas al usuario.
      * Un usuario puede tener múltiples zonas donde puede trabajar.
      */
@@ -149,6 +157,14 @@ public class Usuario {
                     .map(String::toUpperCase)
                     .collect(Collectors.joining(","));
         }
+    }
+
+    public Integer getTiempoLimiteMinutos() {
+        return tiempoLimiteMinutos;
+    }
+
+    public void setTiempoLimiteMinutos(Integer tiempoLimiteMinutos) {
+        this.tiempoLimiteMinutos = tiempoLimiteMinutos;
     }
 
     public Set<Zona> getZonasAsignadas() {

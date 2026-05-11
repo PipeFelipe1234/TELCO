@@ -40,7 +40,8 @@ public class UsuarioService {
                                 u.getFoto(),
                                 u.getTelefono(),
                                 u.getCargo(),
-                                u.getCiudades());
+                                u.getCiudades(),
+                                u.getTiempoLimiteMinutos());
         }
 
         public UsuarioResponse crearUsuario(UsuarioRequest request) {
@@ -58,6 +59,7 @@ public class UsuarioService {
                 usuario.setTelefono(request.telefono());
                 usuario.setCargo(request.cargo());
                 usuario.setCiudades(request.ciudades());
+                usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
 
                 Usuario guardado = usuarioRepository.save(usuario);
 
@@ -76,6 +78,7 @@ public class UsuarioService {
                 usuario.setTelefono(request.telefono());
                 usuario.setCargo(request.cargo());
                 usuario.setCiudades(request.ciudades());
+                usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
 
                 Usuario actualizado = usuarioRepository.save(usuario);
 
@@ -115,6 +118,7 @@ public class UsuarioService {
                 usuario.setTelefono(request.telefono());
                 usuario.setCargo(request.cargo());
                 usuario.setCiudades(request.ciudades());
+                usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
 
                 Usuario actualizado = usuarioRepository.save(usuario);
 
@@ -208,6 +212,9 @@ public class UsuarioService {
                 }
                 if (request.ciudades() != null) {
                         usuario.setCiudades(request.ciudades());
+                }
+                if (request.tiempoLimiteMinutos() != null) {
+                        usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
                 }
 
                 Usuario actualizado = usuarioRepository.save(usuario);
