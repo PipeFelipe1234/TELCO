@@ -17,6 +17,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Duration;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +34,7 @@ public class RegistroService {
     private final GeocodingService geocodingService;
     private final RastreoZonaService rastreoZonaService;
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
+    private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
 
     public RegistroService(RegistroRepository registroRepository,
             RegistroReporteRepository registroReporteRepository,
@@ -51,18 +54,25 @@ public class RegistroService {
         if (iso8601 == null || iso8601.trim().isEmpty()) {
             return null;
         }
+        // Intenta primero con offset de zona (ej. "2026-05-13T21:29:00.000-05:00" de
+        // Flutter)
+        try {
+            ZonedDateTime zdt = ZonedDateTime.parse(iso8601);
+            return zdt.withZoneSameInstant(ZONA_COLOMBIA).toLocalDateTime();
+        } catch (Exception ignored) {
+        }
+        // Intenta LocalDateTime sin offset
         try {
             return LocalDateTime.parse(iso8601, ISO_FORMATTER);
         } catch (Exception e) {
-            // Si falla el parsing, retorna null
             return null;
         }
     }
 
     public RegistroResponse marcarEntrada(Usuario usuario, MarcarEntradaRequest request) {
 
-        LocalDate hoy = LocalDate.now();
-        LocalTime horaActual = LocalTime.now();
+        LocalDate hoy = LocalDate.now(ZONA_COLOMBIA);
+        LocalTime horaActual = LocalTime.now(ZONA_COLOMBIA);
 
         // Validar precisión GPS
         if (request.precisionMetrosCheckin() != null && request.precisionMetrosCheckin() > 50) {
@@ -107,8 +117,8 @@ public class RegistroService {
             Usuario usuario,
             MarcarSalidaRequest request) {
 
-        LocalDate fechaSalida = LocalDate.now();
-        LocalTime horaSalida = LocalTime.now();
+        LocalDate fechaSalida = LocalDate.now(ZONA_COLOMBIA);
+        LocalTime horaSalida = LocalTime.now(ZONA_COLOMBIA);
 
         // Si viene fechaCreacion, usarla para obtener la fecha correcta
         LocalDateTime fechaHoraRegistro = parseISODateTime(request.fechaCreacion());
@@ -180,7 +190,7 @@ public class RegistroService {
 
         LocalDateTime fechaHoraReporte = parseISODateTime(request.fechaCreacion());
         if (fechaHoraReporte == null) {
-            fechaHoraReporte = LocalDateTime.now();
+            fechaHoraReporte = LocalDateTime.now(ZONA_COLOMBIA);
         }
 
         String ubicacion = request.ubicacion();
@@ -302,7 +312,7 @@ public class RegistroService {
 
         if (enCurso) {
             // 🟢 Turno en curso - calcular horas y minutos en tiempo real
-            Duration duracion = Duration.between(r.getHoraEntrada(), LocalTime.now());
+            Duration duracion = Duration.between(r.getHoraEntrada(), LocalTime.now(ZONA_COLOMBIA));
             horasTrabajadas = (int) duracion.toHours();
             minutosTrabajados = (int) duracion.toMinutes();
         } else {
