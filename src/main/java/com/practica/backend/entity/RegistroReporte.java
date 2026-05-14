@@ -34,6 +34,9 @@ public class RegistroReporte {
     @Column(nullable = false)
     private Boolean esSalida = false;
 
+    @Column(name = "novedad_id")
+    private Integer novedadId;
+
     public Long getId() {
         return id;
     }
@@ -112,5 +115,13 @@ public class RegistroReporte {
 
     public void setEsSalida(Boolean esSalida) {
         this.esSalida = esSalida;
+    }
+
+    public Integer getNovedadId() {
+        return novedadId;
+    }
+
+    public void setNovedadId(Integer novedadId) {
+        this.novedadId = novedadId;
     }
 }

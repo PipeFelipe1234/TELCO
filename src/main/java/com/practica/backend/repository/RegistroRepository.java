@@ -25,15 +25,17 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
         List<Registro> findAllByUsuario(Usuario usuario);
 
         // 🔍 FILTROS PERSONALIZADOS PARA ADMIN
-        @Query("SELECT r FROM Registro r JOIN r.usuario u WHERE " +
+        @Query("SELECT DISTINCT r FROM Registro r JOIN r.usuario u WHERE " +
                         "(:fecha IS NULL OR r.fecha = :fecha) AND " +
                         "(:identificacion IS NULL OR LOWER(u.identificacion) LIKE LOWER(CONCAT('%', :identificacion, '%'))) AND "
                         +
-                        "(:nombres IS NULL OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :nombres, '%')))")
+                        "(:nombres IS NULL OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :nombres, '%'))) AND " +
+                        "(:novedadId IS NULL OR EXISTS (SELECT rr FROM RegistroReporte rr WHERE rr.registro = r AND rr.novedadId = :novedadId))")
         List<Registro> findByFiltros(
                         @Param("fecha") LocalDate fecha,
                         @Param("identificacion") String identificacion,
-                        @Param("nombres") String nombres);
+                        @Param("nombres") String nombres,
+                        @Param("novedadId") Integer novedadId);
 
         // 📅 OBTENER REGISTROS POR RANGO DE FECHAS
         @Query("SELECT r FROM Registro r WHERE r.fecha >= :fechaInicio AND r.fecha <= :fechaFin ORDER BY r.fecha ASC, r.horaEntrada ASC")

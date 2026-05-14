@@ -199,7 +199,8 @@ public class RegistroService {
                 request.picture(),
                 ubicacion,
                 fechaHoraReporte,
-                false);
+                false,
+                request.novedadId());
 
         // Mantener visibilidad rápida del último reporte en campos legacy
         registro.setReporte(request.reporte());
@@ -251,7 +252,8 @@ public class RegistroService {
         List<Registro> registros = registroRepository.findByFiltros(
                 filtro.getFecha(),
                 filtro.getIdentificacion(),
-                filtro.getNombres());
+                filtro.getNombres(),
+                filtro.getNovedadId());
 
         return registros.stream()
                 .filter(r -> empleadoVisibleParaAdmin(r, cargoAdmin, admin != null ? admin.getCiudades() : List.of()))
@@ -360,7 +362,8 @@ public class RegistroService {
             String picture,
             String ubicacion,
             LocalDateTime fechaHora,
-            boolean esSalida) {
+            boolean esSalida,
+            Integer novedadId) {
         RegistroReporte reporteTurno = new RegistroReporte();
         reporteTurno.setRegistro(registro);
         reporteTurno.setLatitud(latitud);
@@ -371,6 +374,7 @@ public class RegistroService {
         reporteTurno.setUbicacion(ubicacion);
         reporteTurno.setFechaHora(fechaHora);
         reporteTurno.setEsSalida(esSalida);
+        reporteTurno.setNovedadId(novedadId);
         registroReporteRepository.save(reporteTurno);
     }
 
@@ -384,7 +388,8 @@ public class RegistroService {
                 reporte.getReporte(),
                 reporte.getPicture(),
                 reporte.getUbicacion(),
-                reporte.getEsSalida());
+                reporte.getEsSalida(),
+                reporte.getNovedadId());
     }
 
     // 📲 NOTIFICACIÓN DE ENTRADA
