@@ -7,6 +7,7 @@ public class RegistroFilterRequest {
     private LocalDate fecha;
     private String identificacion;
     private String nombres;
+    private Integer novedadId;
 
     public RegistroFilterRequest() {
     }
@@ -39,5 +40,13 @@ public class RegistroFilterRequest {
 
     public void setNombres(String nombres) {
         this.nombres = nombres;
+    }
+
+    public Integer getNovedadId() {
+        return novedadId;
+    }
+
+    public void setNovedadId(Integer novedadId) {
+        this.novedadId = novedadId;
     }
 }

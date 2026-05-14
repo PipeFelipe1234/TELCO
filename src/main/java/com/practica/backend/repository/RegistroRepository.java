@@ -25,15 +25,17 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
         List<Registro> findAllByUsuario(Usuario usuario);
 
         // 🔍 FILTROS PERSONALIZADOS PARA ADMIN
-        @Query("SELECT r FROM Registro r JOIN r.usuario u WHERE " +
+        @Query("SELECT DISTINCT r FROM Registro r JOIN r.usuario u WHERE " +
                         "(:fecha IS NULL OR r.fecha = :fecha) AND " +
                         "(:identificacion IS NULL OR LOWER(u.identificacion) LIKE LOWER(CONCAT('%', :identificacion, '%'))) AND "
                         +
-                        "(:nombres IS NULL OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :nombres, '%')))")
+                        "(:nombres IS NULL OR LOWER(u.nombre) LIKE LOWER(CONCAT('%', :nombres, '%'))) AND " +
+                        "(:novedadId IS NULL OR EXISTS (SELECT rr FROM RegistroReporte rr WHERE rr.registro = r AND rr.novedadId = :novedadId))")
         List<Registro> findByFiltros(
                         @Param("fecha") LocalDate fecha,
                         @Param("identificacion") String identificacion,
-                        @Param("nombres") String nombres);
+                        @Param("nombres") String nombres,
+                        @Param("novedadId") Integer novedadId);
 
         // 📅 OBTENER REGISTROS POR RANGO DE FECHAS
         @Query("SELECT r FROM Registro r WHERE r.fecha >= :fechaInicio AND r.fecha <= :fechaFin ORDER BY r.fecha ASC, r.horaEntrada ASC")
@@ -80,6 +82,24 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
         // 📅 OBTENER EL MES MÁS ANTIGUO CON REGISTROS
         @Query("SELECT MIN(r.fecha) FROM Registro r")
         LocalDate findFechaMasAntigua();
+
+        // � DASHBOARD: suma de minutos trabajados agrupada por usuario en un rango
+        @Query("SELECT r.usuario.id, r.usuario.nombre, SUM(r.minutosTrabajados), COUNT(r) " +
+                        "FROM Registro r " +
+                        "WHERE r.fecha >= :inicio AND r.fecha <= :fin AND r.horaSalida IS NOT NULL " +
+                        "GROUP BY r.usuario.id, r.usuario.nombre " +
+                        "ORDER BY SUM(r.minutosTrabajados) DESC")
+        List<Object[]> sumMinutosByUsuarioInRange(
+                        @Param("inicio") LocalDate inicio,
+                        @Param("fin") LocalDate fin);
+
+        // 📊 DASHBOARD: cantidad de registros por día en un rango (asistencia diaria)
+        @Query("SELECT r.fecha, COUNT(r) FROM Registro r " +
+                        "WHERE r.fecha >= :inicio AND r.fecha <= :fin " +
+                        "GROUP BY r.fecha ORDER BY r.fecha ASC")
+        List<Object[]> countRegistrosByFechaInRange(
+                        @Param("inicio") LocalDate inicio,
+                        @Param("fin") LocalDate fin);
 
         // 📍 OBTENER TODOS LOS REGISTROS EN TURNO (empleados con entrada pero sin
         // salida)

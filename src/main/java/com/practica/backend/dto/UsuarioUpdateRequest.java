@@ -9,12 +9,13 @@ import java.util.List;
  * Todos los campos son opcionales - solo se actualizan los que se envían.
  */
 public record UsuarioUpdateRequest(
-                String identificacion,
-                String nombre,
-                @Email String email,
-                String rol,
-                String foto,
-                @ValidPhoneNumber String telefono,
-                String cargo,
-                List<String> ciudades) {
+        String identificacion,
+        String nombre,
+        @Email String email,
+        String rol,
+        String foto,
+        @ValidPhoneNumber String telefono,
+        String cargo,
+        List<String> ciudades,
+        Integer tiempoLimiteMinutos) {
 }

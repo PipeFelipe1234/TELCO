@@ -44,9 +44,10 @@ public class RastreoZonaService {
     private static final Logger logger = LoggerFactory.getLogger(RastreoZonaService.class);
     private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
 
-    // Umbrales de tiempo en minutos (para residencia)
-    private static final int UMBRAL_NORMAL = 3; // Después de 3 min -> NORMAL
-    private static final int UMBRAL_PREOCUPANTE = 10; // Después de 10 min -> PREOCUPANTE
+    // Porcentajes del límite de tiempo configurable por usuario
+    private static final double PORCENTAJE_NORMAL = 0.70; // 70% del límite → NORMAL (Amarillo)
+    private static final double PORCENTAJE_PREOCUPANTE = 1.00; // 100% del límite → PREOCUPANTE (Rojo)
+    private static final int TIEMPO_LIMITE_DEFECTO = 10; // Minutos por defecto si el usuario no tiene límite
 
     // Radio en metros para considerar que es la misma residencia
     private static final double RADIO_RESIDENCIA_METROS = 100.0;
@@ -336,7 +337,7 @@ public class RastreoZonaService {
                         rastreo.getTimestampEntradaResidencia(), ahora);
 
                 // Determinar nuevo estado
-                EstadoTiempo nuevoEstado = calcularEstado(minutosEnResidencia);
+                EstadoTiempo nuevoEstado = calcularEstado(minutosEnResidencia, empleado.getTiempoLimiteMinutos());
                 EstadoTiempo estadoAnterior = rastreo.getEstadoTiempo();
 
                 rastreo.setEstadoTiempo(nuevoEstado);
@@ -394,15 +395,22 @@ public class RastreoZonaService {
     }
 
     /**
-     * Calcula el estado de tiempo según los minutos en residencia
+     * Calcula el estado de tiempo según los minutos en residencia y el límite del
+     * usuario.
+     * Verde (BIEN): 0%–70% del límite. Amarillo (NORMAL): 70%–100%. Rojo
+     * (PREOCUPANTE): >100%.
      */
-    private EstadoTiempo calcularEstado(int minutos) {
-        if (minutos >= UMBRAL_PREOCUPANTE) {
-            return EstadoTiempo.PREOCUPANTE;
-        } else if (minutos >= UMBRAL_NORMAL) {
-            return EstadoTiempo.NORMAL;
+    private EstadoTiempo calcularEstado(int minutos, Integer tiempoLimiteMinutos) {
+        int limite = (tiempoLimiteMinutos != null && tiempoLimiteMinutos > 0)
+                ? tiempoLimiteMinutos
+                : TIEMPO_LIMITE_DEFECTO;
+        double porcentaje = (double) minutos / limite;
+        if (porcentaje >= PORCENTAJE_PREOCUPANTE) {
+            return EstadoTiempo.PREOCUPANTE; // Rojo: > 100% del límite
+        } else if (porcentaje >= PORCENTAJE_NORMAL) {
+            return EstadoTiempo.NORMAL; // Amarillo: 70%–100% del límite
         } else {
-            return EstadoTiempo.BIEN;
+            return EstadoTiempo.BIEN; // Verde: 0%–70% del límite
         }
     }
 
