@@ -599,7 +599,7 @@ public class RastreoZonaService {
                                 r.getTimestampEntradaResidencia(),
                                 LocalDateTime.now(ZONA_COLOMBIA));
                     }
-                    return RastreoZonaResponse.fromEntity(r, minutos);
+                    return construirRespuestaConEstadoActual(r, minutos);
                 })
                 .toList();
     }
@@ -650,17 +650,9 @@ public class RastreoZonaService {
      * Obtiene los rastreos en estado PREOCUPANTE
      */
     public List<RastreoZonaResponse> obtenerRastreosPreocupantes() {
-        return rastreoRepository.findByEstadoPreocupante().stream()
-                .map(r -> {
-                    int minutos = 0;
-                    // Calcular minutos en RESIDENCIA
-                    if (r.getTimestampEntradaResidencia() != null) {
-                        minutos = (int) ChronoUnit.MINUTES.between(
-                                r.getTimestampEntradaResidencia(),
-                                LocalDateTime.now(ZONA_COLOMBIA));
-                    }
-                    return RastreoZonaResponse.fromEntity(r, minutos);
-                })
+        // Se calcula en tiempo real para evitar estados desactualizados en BD.
+        return obtenerTodosLosRastreos().stream()
+                .filter(r -> EstadoTiempo.PREOCUPANTE.name().equals(r.estadoTiempo()))
                 .toList();
     }
 
@@ -679,7 +671,30 @@ public class RastreoZonaService {
                     LocalDateTime.now(ZONA_COLOMBIA));
         }
 
-        return RastreoZonaResponse.fromEntity(rastreo, minutos);
+        return construirRespuestaConEstadoActual(rastreo, minutos);
+    }
+
+    /**
+     * Construye la respuesta recalculando el estado en tiempo real según minutos
+     * transcurridos y límite configurado del usuario.
+     */
+    private RastreoZonaResponse construirRespuestaConEstadoActual(RastreoZona rastreo, int minutosEnResidencia) {
+        EstadoTiempo estadoActual = calcularEstado(minutosEnResidencia, rastreo.getEmpleado().getTiempoLimiteMinutos());
+
+        return new RastreoZonaResponse(
+                rastreo.getEmpleado().getId(),
+                rastreo.getEmpleado().getNombre(),
+                rastreo.getEmpleado().getIdentificacion(),
+                rastreo.getEmpleado().getCargo(),
+                rastreo.getZonaActual() != null ? rastreo.getZonaActual().getId() : null,
+                rastreo.getZonaActual() != null ? rastreo.getZonaActual().getNombre() : "Fuera de zona",
+                rastreo.getZonaActual() != null,
+                estadoActual.name(),
+                minutosEnResidencia,
+                rastreo.getUltimaLatitud(),
+                rastreo.getUltimaLongitud(),
+                rastreo.getTimestampEntradaResidencia(),
+                rastreo.getUltimaActualizacion());
     }
 
     /**
