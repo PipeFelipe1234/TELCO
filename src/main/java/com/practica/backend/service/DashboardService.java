@@ -2,12 +2,12 @@ package com.practica.backend.service;
 
 import com.practica.backend.dto.DashboardResponse;
 import com.practica.backend.dto.DashboardResponse.*;
-import com.practica.backend.entity.RastreoZona;
 import com.practica.backend.entity.Registro;
 import com.practica.backend.entity.SolicitudUbicacion;
+import com.practica.backend.entity.Usuario;
+import com.practica.backend.dto.RastreoZonaResponse;
 import com.practica.backend.repository.RegistroReporteRepository;
 import com.practica.backend.repository.RegistroRepository;
-import com.practica.backend.repository.RastreoZonaRepository;
 import com.practica.backend.repository.SolicitudUbicacionRepository;
 import com.practica.backend.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
@@ -32,23 +32,24 @@ public class DashboardService {
         private final UsuarioRepository usuarioRepository;
         private final RegistroRepository registroRepository;
         private final RegistroReporteRepository registroReporteRepository;
-        private final RastreoZonaRepository rastreoZonaRepository;
         private final SolicitudUbicacionRepository solicitudUbicacionRepository;
+        private final RastreoZonaService rastreoZonaService;
 
         public DashboardService(
                         UsuarioRepository usuarioRepository,
                         RegistroRepository registroRepository,
                         RegistroReporteRepository registroReporteRepository,
-                        RastreoZonaRepository rastreoZonaRepository,
-                        SolicitudUbicacionRepository solicitudUbicacionRepository) {
+                        SolicitudUbicacionRepository solicitudUbicacionRepository,
+                        RastreoZonaService rastreoZonaService) {
                 this.usuarioRepository = usuarioRepository;
                 this.registroRepository = registroRepository;
                 this.registroReporteRepository = registroReporteRepository;
-                this.rastreoZonaRepository = rastreoZonaRepository;
                 this.solicitudUbicacionRepository = solicitudUbicacionRepository;
+                this.rastreoZonaService = rastreoZonaService;
         }
 
-        public DashboardResponse obtenerDashboard(String periodo, LocalDate fechaInicio, LocalDate fechaFin) {
+        public DashboardResponse obtenerDashboard(String periodo, LocalDate fechaInicio, LocalDate fechaFin,
+                        Usuario admin) {
                 LocalDate hoy = LocalDate.now(ZONA_COLOMBIA);
 
                 LocalDate inicio;
@@ -75,7 +76,7 @@ public class DashboardService {
 
                 PeriodoInfo periodoInfo = new PeriodoInfo(periodo != null ? periodo.toUpperCase() : "HOY", inicio, fin);
 
-                TiempoRealMetrics tiempoReal = buildTiempoReal(hoy);
+                TiempoRealMetrics tiempoReal = buildTiempoReal(hoy, admin);
                 ProductividadMetrics productividad = buildProductividad(inicio, fin);
                 KpisMetrics kpis = buildKpis(productividad, inicio, fin);
                 SolicitudesMetrics solicitudes = buildSolicitudes(inicio, fin);
@@ -87,48 +88,42 @@ public class DashboardService {
         // TIEMPO REAL
         // ─────────────────────────────────────────
 
-        private TiempoRealMetrics buildTiempoReal(LocalDate hoy) {
-                int totalEquipo = usuarioRepository.findByRol("USER").size();
+        private TiempoRealMetrics buildTiempoReal(LocalDate hoy, Usuario admin) {
+                String cargoAdmin = admin != null ? admin.getCargo() : null;
+                int totalEquipo = contarEquipoVisible(cargoAdmin);
 
-                // enTurnoAhora: sin importar fecha, todos los que tienen entrada sin salida
-                List<Registro> todosEnTurno = registroRepository.findAllRegistrosEnTurno();
-                int enTurnoAhora = todosEnTurno.size();
+                // Mismo criterio que mapa: rastreo filtrado y estado recalculado en tiempo real
+                List<RastreoZonaResponse> rastreos = rastreoZonaService.obtenerTodosLosRastreosFiltrados(cargoAdmin);
+                int enTurnoAhora = rastreos.size();
 
                 List<Registro> registrosHoy = registroRepository.findByFechaRange(hoy, hoy);
-                int yaSalieronHoy = (int) registrosHoy.stream().filter(r -> r.getHoraSalida() != null).count();
+                int yaSalieronHoy = (int) registrosHoy.stream()
+                                .filter(r -> r.getHoraSalida() != null)
+                                .filter(r -> empleadoVisiblePorCargo(r.getUsuario(), cargoAdmin))
+                                .count();
                 int sinEntrarHoy = Math.max(0, totalEquipo - enTurnoAhora - yaSalieronHoy);
-
-                List<RastreoZona> rastreos = rastreoZonaRepository.findAll();
 
                 // Técnicos/empleados con estado preocupante
                 List<TecnicoPreocupante> preocupantes = rastreos.stream()
-                                .filter(r -> r.getEstadoTiempo() != null
-                                                && r.getEstadoTiempo().name().equals("PREOCUPANTE"))
+                                .filter(r -> "PREOCUPANTE".equals(r.estadoTiempo()))
                                 .map(r -> {
-                                        int minutos = 0;
-                                        if (r.getTimestampEntradaResidencia() != null) {
-                                                minutos = (int) ChronoUnit.MINUTES.between(
-                                                                r.getTimestampEntradaResidencia(),
-                                                                LocalDateTime.now(ZONA_COLOMBIA));
-                                        }
-                                        String zona = r.getZonaActual() != null ? r.getZonaActual().getNombre() : null;
                                         return new TecnicoPreocupante(
-                                                        r.getEmpleado().getId(),
-                                                        r.getEmpleado().getNombre(),
-                                                        r.getEmpleado().getCargo(),
-                                                        minutos,
-                                                        r.getEstadoTiempo().name(),
-                                                        zona,
-                                                        r.getUltimaLatitud(),
-                                                        r.getUltimaLongitud());
+                                                        r.empleadoId(),
+                                                        r.empleadoNombre(),
+                                                        r.empleadoCargo(),
+                                                        r.minutosEnResidencia() != null ? r.minutosEnResidencia() : 0,
+                                                        r.estadoTiempo(),
+                                                        r.zonaNombre(),
+                                                        r.latitud(),
+                                                        r.longitud());
                                 })
                                 .toList();
 
                 // Distribución por zona (empleados con zona actual asignada)
                 Map<String, Long> porZona = rastreos.stream()
-                                .filter(r -> r.getZonaActual() != null)
+                                .filter(r -> r.zonaId() != null)
                                 .collect(Collectors.groupingBy(
-                                                r -> r.getZonaActual().getNombre(),
+                                                RastreoZonaResponse::zonaNombre,
                                                 Collectors.counting()));
 
                 List<EmpleadosPorZona> distribucion = porZona.entrySet().stream()
@@ -137,6 +132,29 @@ public class DashboardService {
 
                 return new TiempoRealMetrics(totalEquipo, enTurnoAhora, yaSalieronHoy, sinEntrarHoy,
                                 preocupantes, distribucion);
+        }
+
+        private int contarEquipoVisible(String cargoAdmin) {
+                if ("ADMIN_TEC".equals(cargoAdmin)) {
+                        return usuarioRepository.findAllTecnicos().size();
+                }
+                if ("ADMIN_COO".equals(cargoAdmin)) {
+                        return usuarioRepository.findAllCoobradores().size();
+                }
+                return usuarioRepository.findByRol("USER").size();
+        }
+
+        private boolean empleadoVisiblePorCargo(Usuario empleado, String cargoAdmin) {
+                if (cargoAdmin == null || "ADMIN".equals(cargoAdmin)) {
+                        return true;
+                }
+                if ("ADMIN_TEC".equals(cargoAdmin)) {
+                        return "USER_TEC".equals(empleado.getCargo());
+                }
+                if ("ADMIN_COO".equals(cargoAdmin)) {
+                        return "USER_COO".equals(empleado.getCargo());
+                }
+                return false;
         }
 
         // ─────────────────────────────────────────
