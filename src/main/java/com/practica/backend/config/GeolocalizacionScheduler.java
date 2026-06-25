@@ -1,6 +1,7 @@
 package com.practica.backend.config;
 
 import com.practica.backend.service.GeolocalizacionService;
+import com.practica.backend.service.RastreoZonaService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -19,9 +20,12 @@ public class GeolocalizacionScheduler {
     private static final Logger logger = LoggerFactory.getLogger(GeolocalizacionScheduler.class);
 
     private final GeolocalizacionService geolocalizacionService;
+    private final RastreoZonaService rastreoZonaService;
 
-    public GeolocalizacionScheduler(GeolocalizacionService geolocalizacionService) {
+    public GeolocalizacionScheduler(GeolocalizacionService geolocalizacionService,
+            RastreoZonaService rastreoZonaService) {
         this.geolocalizacionService = geolocalizacionService;
+        this.rastreoZonaService = rastreoZonaService;
     }
 
     /**
@@ -56,6 +60,11 @@ public class GeolocalizacionScheduler {
     @Scheduled(fixedRate = 60000) // cada 1 minuto
     public void rastreoAutomaticoTiempoReal() {
         try {
+            int huerfanos = rastreoZonaService.limpiarRastreosHuerfanos();
+            if (huerfanos > 0) {
+                logger.info("🧹 Scheduler: {} rastreos huérfanos eliminados", huerfanos);
+            }
+
             int enviadas = geolocalizacionService.enviarSolicitudesAutomaticas();
             // Solo loguear si hubo solicitudes enviadas
             if (enviadas > 0) {

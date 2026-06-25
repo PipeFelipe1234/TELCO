@@ -11,6 +11,7 @@ import com.practica.backend.entity.RastreoZona.EstadoTiempo;
 import com.practica.backend.entity.TokenDispositivo;
 import com.practica.backend.entity.Usuario;
 import com.practica.backend.entity.Zona;
+import com.practica.backend.repository.RegistroRepository;
 import com.practica.backend.repository.RastreoZonaRepository;
 import com.practica.backend.repository.TokenDispositivoRepository;
 import com.practica.backend.repository.UsuarioRepository;
@@ -25,6 +26,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Servicio para rastrear empleados con dos niveles:
@@ -53,16 +55,19 @@ public class RastreoZonaService {
     private static final double RADIO_RESIDENCIA_METROS = 100.0;
 
     private final RastreoZonaRepository rastreoRepository;
+    private final RegistroRepository registroRepository;
     private final ZonaService zonaService;
     private final UsuarioRepository usuarioRepository;
     private final TokenDispositivoRepository tokenDispositivoRepository;
 
     public RastreoZonaService(
             RastreoZonaRepository rastreoRepository,
+            RegistroRepository registroRepository,
             ZonaService zonaService,
             UsuarioRepository usuarioRepository,
             TokenDispositivoRepository tokenDispositivoRepository) {
         this.rastreoRepository = rastreoRepository;
+        this.registroRepository = registroRepository;
         this.zonaService = zonaService;
         this.usuarioRepository = usuarioRepository;
         this.tokenDispositivoRepository = tokenDispositivoRepository;
@@ -580,7 +585,12 @@ public class RastreoZonaService {
      * Los minutos se calculan basándose en la RESIDENCIA, no en la zona.
      */
     public List<RastreoZonaResponse> obtenerTodosLosRastreos() {
+        Set<Long> empleadosEnTurnoIds = registroRepository.findAllRegistrosEnTurno().stream()
+                .map(r -> r.getUsuario().getId())
+                .collect(Collectors.toSet());
+
         return rastreoRepository.findAllOrderByEstado().stream()
+                .filter(r -> empleadosEnTurnoIds.contains(r.getEmpleado().getId()))
                 .map(r -> {
                     int minutos = 0;
                     // Calcular minutos en RESIDENCIA (no en zona)
@@ -592,6 +602,28 @@ public class RastreoZonaService {
                     return RastreoZonaResponse.fromEntity(r, minutos);
                 })
                 .toList();
+    }
+
+    /**
+     * Elimina rastreos huérfanos: empleados que aparecen en rastreo_zona
+     * pero ya no tienen un turno activo (entrada sin salida).
+     */
+    @Transactional
+    public int limpiarRastreosHuerfanos() {
+        Set<Long> empleadosEnTurnoIds = registroRepository.findAllRegistrosEnTurno().stream()
+                .map(r -> r.getUsuario().getId())
+                .collect(Collectors.toSet());
+
+        List<RastreoZona> huerfanos = rastreoRepository.findAll().stream()
+                .filter(r -> !empleadosEnTurnoIds.contains(r.getEmpleado().getId()))
+                .toList();
+
+        if (!huerfanos.isEmpty()) {
+            rastreoRepository.deleteAll(huerfanos);
+            logger.info("🧹 Limpieza de rastreo_zona: {} registros huérfanos eliminados", huerfanos.size());
+        }
+
+        return huerfanos.size();
     }
 
     /**

@@ -94,15 +94,16 @@ public class ExportService {
     // ============================
 
     /**
-     * Convierte fecha y hora desde la zona del servidor a hora Colombia.
+     * Construye fecha y hora en zona Colombia. Las horas ya se guardan en hora
+     * Colombia en la BD, por lo que NO se aplica conversión de instante (solo se
+     * etiqueta la zona).
      */
     private ZonedDateTime toColombia(LocalDate fecha, LocalTime hora) {
         if (fecha == null || hora == null) {
             return null;
         }
 
-        ZonedDateTime fechaHoraServidor = ZonedDateTime.of(fecha, hora, ZoneId.systemDefault());
-        return fechaHoraServidor.withZoneSameInstant(ZONA_COLOMBIA);
+        return ZonedDateTime.of(fecha, hora, ZONA_COLOMBIA);
     }
 
     /**
@@ -118,17 +119,15 @@ public class ExportService {
     }
 
     /**
-     * Convierte fecha/hora de un reporte a hora Colombia para mostrar en
-     * exportación.
+     * Formatea la hora de un reporte. La hora ya está en hora Colombia en la BD,
+     * por lo que se formatea directamente sin conversión de instante.
      */
     private String formatReporteHora(LocalDateTime fechaHora) {
         if (fechaHora == null) {
             return "---";
         }
 
-        ZonedDateTime fechaHoraServidor = fechaHora.atZone(ZoneId.systemDefault());
-        ZonedDateTime fechaHoraColombia = fechaHoraServidor.withZoneSameInstant(ZONA_COLOMBIA);
-        return fechaHoraColombia.toLocalTime().format(TIME_AM_PM_FORMATTER).toLowerCase();
+        return fechaHora.toLocalTime().format(TIME_AM_PM_FORMATTER).toLowerCase();
     }
 
     /**
