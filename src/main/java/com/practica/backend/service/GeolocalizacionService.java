@@ -469,6 +469,24 @@ public class GeolocalizacionService {
     }
 
     /**
+     * Elimina solicitudes AUTOMÁTICAS antiguas (rastreo cada 60s)
+     * para evitar crecimiento infinito de la tabla.
+     *
+     * @return cantidad de registros eliminados
+     */
+    @Transactional
+    public int eliminarSolicitudesAutomaticasAntiguas() {
+        LocalDateTime fechaLimite = LocalDateTime.now(ZONA_COLOMBIA).minusHours(24);
+        int eliminadas = solicitudRepository.deleteAutomaticasAnterioresA(fechaLimite);
+
+        if (eliminadas > 0) {
+            logger.info("🧹 Eliminadas {} solicitudes automáticas antiguas (>{} horas)", eliminadas, 24);
+        }
+
+        return eliminadas;
+    }
+
+    /**
      * Obtiene información sobre la próxima limpieza automática de geolocalizaciones
      * Muestra solo las MANUALES que se perderán (las exportables)
      */

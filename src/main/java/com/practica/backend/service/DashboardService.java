@@ -19,9 +19,11 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -95,12 +97,21 @@ public class DashboardService {
                 // Mismo criterio que mapa: rastreo filtrado y estado recalculado en tiempo real
                 List<RastreoZonaResponse> rastreos = rastreoZonaService.obtenerTodosLosRastreosFiltrados(cargoAdmin);
                 int enTurnoAhora = rastreos.size();
+                Set<Long> enTurnoIds = rastreos.stream()
+                                .map(RastreoZonaResponse::empleadoId)
+                                .collect(Collectors.toSet());
 
                 List<Registro> registrosHoy = registroRepository.findByFechaRange(hoy, hoy);
-                int yaSalieronHoy = (int) registrosHoy.stream()
+                // Evitar doble conteo: si salió hoy pero actualmente está en turno, cuenta como
+                // EN TURNO
+                Set<Long> yaSalieronIds = registrosHoy.stream()
                                 .filter(r -> r.getHoraSalida() != null)
                                 .filter(r -> empleadoVisiblePorCargo(r.getUsuario(), cargoAdmin))
-                                .count();
+                                .map(r -> r.getUsuario().getId())
+                                .filter(id -> !enTurnoIds.contains(id))
+                                .collect(Collectors.toSet());
+
+                int yaSalieronHoy = yaSalieronIds.size();
                 int sinEntrarHoy = Math.max(0, totalEquipo - enTurnoAhora - yaSalieronHoy);
 
                 // Técnicos/empleados con estado preocupante
@@ -263,7 +274,9 @@ public class DashboardService {
         // ─────────────────────────────────────────
 
         private SolicitudesMetrics buildSolicitudes(LocalDate inicio, LocalDate fin) {
-                List<SolicitudUbicacion> solicitudes = solicitudUbicacionRepository.findByFechaRange(inicio, fin);
+                // Dashboard de analíticas: SOLO solicitudes MANUALES (excluir automáticas)
+                List<SolicitudUbicacion> solicitudes = solicitudUbicacionRepository.findManualesByFechaRange(inicio,
+                                fin);
 
                 long total = solicitudes.size();
                 long respondidas = solicitudes.stream().filter(s -> "RESPONDIDA".equals(s.getEstado())).count();

@@ -74,4 +74,21 @@ public class GeolocalizacionScheduler {
             logger.error("❌ Error en scheduler de rastreo automático: {}", e.getMessage());
         }
     }
+
+    /**
+     * Limpia solicitudes automáticas antiguas cada 24 horas.
+     * Mantiene la tabla solicitudes_ubicacion ligera eliminando solo las de rastreo
+     * automático (cada 60 segundos).
+     */
+    @Scheduled(fixedRate = 86400000) // cada 24 horas
+    public void limpiarSolicitudesAutomaticasAntiguas() {
+        try {
+            int eliminadas = geolocalizacionService.eliminarSolicitudesAutomaticasAntiguas();
+            if (eliminadas > 0) {
+                logger.info("🧹 Scheduler diario: {} solicitudes automáticas eliminadas", eliminadas);
+            }
+        } catch (Exception e) {
+            logger.error("❌ Error en limpieza diaria de solicitudes automáticas: {}", e.getMessage());
+        }
+    }
 }
