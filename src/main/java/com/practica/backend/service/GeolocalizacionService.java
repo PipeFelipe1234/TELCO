@@ -146,13 +146,19 @@ public class GeolocalizacionService {
             solicitud.setLongitud(request.longitud());
             solicitud.setPrecisionMetros(request.precisionMetros());
 
-            // 📍 Reverse geocoding: si el frontend envía ubicación la usamos, si no,
-            // llamamos a Google API
+            // 📍 Reverse geocoding:
+            // - Si el frontend envía ubicación la usamos
+            // - Si es solicitud automática, NO llamar Google (control de costos)
+            // - Si es manual y no viene ubicación, llamar Google API
             String ubicacion = request.ubicacion();
             if (ubicacion == null || ubicacion.trim().isEmpty()) {
-                ubicacion = geocodingService.obtenerDireccion(
-                        request.latitud(),
-                        request.longitud());
+                if (Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                    ubicacion = String.format("Lat: %.6f, Lon: %.6f", request.latitud(), request.longitud());
+                } else {
+                    ubicacion = geocodingService.obtenerDireccion(
+                            request.latitud(),
+                            request.longitud());
+                }
             }
             solicitud.setUbicacion(ubicacion);
             solicitud.setEstado("RESPONDIDA");

@@ -9,6 +9,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * Servicio para hacer reverse geocoding usando Google Geocoding API.
  * Convierte coordenadas (lat, lng) en direcciones legibles.
@@ -21,6 +25,11 @@ public class GeocodingService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+
+    // Cache en memoria para evitar llamadas repetidas a Google por coordenadas
+    // cercanas
+    private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private static final long CACHE_TTL_SECONDS = 24 * 60 * 60; // 24 horas
 
     @Value("${google.geocoding.api-key:}")
     private String apiKey;
@@ -40,6 +49,12 @@ public class GeocodingService {
     public String obtenerDireccion(Double latitud, Double longitud) {
         if (latitud == null || longitud == null) {
             return null;
+        }
+
+        String cacheKey = buildCacheKey(latitud, longitud);
+        String cached = getFromCache(cacheKey);
+        if (cached != null) {
+            return cached;
         }
 
         // Si no hay API key configurada, retornar coordenadas
@@ -71,21 +86,54 @@ public class GeocodingService {
                     // Quitar ", Colombia" del final ya que se sobreentiende
                     direccion = quitarPais(direccion);
                     logger.info("✅ Dirección obtenida: {}", direccion);
+                    putInCache(cacheKey, direccion);
                     return direccion;
                 }
             } else if ("ZERO_RESULTS".equals(status)) {
                 logger.warn("⚠️ Sin resultados para las coordenadas: {}, {}", latitud, longitud);
-                return formatearCoordenadas(latitud, longitud);
+                String fallback = formatearCoordenadas(latitud, longitud);
+                putInCache(cacheKey, fallback);
+                return fallback;
             } else {
                 logger.error("❌ Error en Geocoding API. Status: {}", status);
-                return formatearCoordenadas(latitud, longitud);
+                String fallback = formatearCoordenadas(latitud, longitud);
+                putInCache(cacheKey, fallback);
+                return fallback;
             }
 
         } catch (Exception e) {
             logger.error("❌ Error al llamar Google Geocoding API: {}", e.getMessage());
         }
 
-        return formatearCoordenadas(latitud, longitud);
+        String fallback = formatearCoordenadas(latitud, longitud);
+        putInCache(cacheKey, fallback);
+        return fallback;
+    }
+
+    private String buildCacheKey(Double latitud, Double longitud) {
+        // Redondeo a 5 decimales (~1.1m) para agrupar coordenadas casi iguales
+        double lat = Math.round(latitud * 100000.0) / 100000.0;
+        double lon = Math.round(longitud * 100000.0) / 100000.0;
+        return lat + "," + lon;
+    }
+
+    private String getFromCache(String key) {
+        CacheEntry entry = cache.get(key);
+        if (entry == null) {
+            return null;
+        }
+        if (Instant.now().isAfter(entry.expiresAt())) {
+            cache.remove(key);
+            return null;
+        }
+        return entry.address();
+    }
+
+    private void putInCache(String key, String address) {
+        cache.put(key, new CacheEntry(address, Instant.now().plusSeconds(CACHE_TTL_SECONDS)));
+    }
+
+    private record CacheEntry(String address, Instant expiresAt) {
     }
 
     /**
