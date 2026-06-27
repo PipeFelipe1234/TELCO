@@ -14,6 +14,8 @@ public interface RegistroReporteRepository extends JpaRepository<RegistroReporte
 
         List<RegistroReporte> findByRegistroOrderByFechaHoraAsc(Registro registro);
 
+        boolean existsByRegistroUsuarioIdAndFechaHora(Long usuarioId, LocalDateTime fechaHora);
+
         Optional<RegistroReporte> findTopByRegistroOrderByFechaHoraDesc(Registro registro);
 
         // 📊 DASHBOARD: total de reportes agrupados por usuario en un rango de fechas

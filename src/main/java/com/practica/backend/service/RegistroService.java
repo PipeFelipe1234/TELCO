@@ -11,6 +11,7 @@ import com.practica.backend.entity.RegistroReporte;
 import com.practica.backend.entity.Usuario;
 import com.practica.backend.repository.RegistroReporteRepository;
 import com.practica.backend.repository.RegistroRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -20,7 +21,6 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -197,6 +197,14 @@ public class RegistroService {
             fechaHoraReporte = LocalDateTime.now(ZONA_COLOMBIA);
         }
 
+        // Idempotencia exacta para sincronización offline: mismo usuario + mismo
+        // timestamp original del frontend => mismo reporte.
+        boolean yaExistePorTimestamp = registroReporteRepository
+                .existsByRegistroUsuarioIdAndFechaHora(usuario.getId(), fechaHoraReporte);
+        if (yaExistePorTimestamp) {
+            return mapToResponse(registro);
+        }
+
         Optional<RegistroReporte> ultimoReporteOpt = registroReporteRepository
                 .findTopByRegistroOrderByFechaHoraDesc(registro);
         if (ultimoReporteOpt.isPresent()
@@ -212,17 +220,22 @@ public class RegistroService {
             ubicacion = geocodingService.obtenerDireccion(request.latitud(), request.longitud());
         }
 
-        crearReporteTurno(
-                registro,
-                request.latitud(),
-                request.longitud(),
-                request.precisionMetros(),
-                request.reporte(),
-                request.picture(),
-                ubicacion,
-                fechaHoraReporte,
-                false,
-                request.novedadId());
+        try {
+            crearReporteTurno(
+                    registro,
+                    request.latitud(),
+                    request.longitud(),
+                    request.precisionMetros(),
+                    request.reporte(),
+                    request.picture(),
+                    ubicacion,
+                    fechaHoraReporte,
+                    false,
+                    request.novedadId());
+        } catch (DataIntegrityViolationException ex) {
+            // Segunda barrera (BD): en carrera concurrente, no duplicar reporte.
+            return mapToResponse(registro);
+        }
 
         // Mantener visibilidad rápida del último reporte en campos legacy
         registro.setReporte(request.reporte());

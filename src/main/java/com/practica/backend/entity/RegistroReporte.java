@@ -5,7 +5,9 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "registro_reportes")
+@Table(name = "registro_reportes", uniqueConstraints = {
+        @UniqueConstraint(name = "uq_registro_reporte_fecha", columnNames = { "registro_id", "fecha_hora" })
+})
 public class RegistroReporte {
 
     @Id
