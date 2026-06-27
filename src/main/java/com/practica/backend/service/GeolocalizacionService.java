@@ -482,11 +482,12 @@ public class GeolocalizacionService {
      */
     @Transactional
     public int eliminarSolicitudesAutomaticasAntiguas() {
-        LocalDateTime fechaLimite = LocalDateTime.now(ZONA_COLOMBIA).minusHours(24);
+        // Conservamos solo la última hora de solicitudes automáticas.
+        LocalDateTime fechaLimite = LocalDateTime.now(ZONA_COLOMBIA).minusHours(1);
         int eliminadas = solicitudRepository.deleteAutomaticasAnterioresA(fechaLimite);
 
         if (eliminadas > 0) {
-            logger.info("🧹 Eliminadas {} solicitudes automáticas antiguas (>{} horas)", eliminadas, 24);
+            logger.info("🧹 Eliminadas {} solicitudes automáticas antiguas (>{} hora)", eliminadas, 1);
         }
 
         return eliminadas;

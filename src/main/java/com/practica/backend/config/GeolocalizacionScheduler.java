@@ -76,11 +76,11 @@ public class GeolocalizacionScheduler {
     }
 
     /**
-     * Limpia solicitudes automáticas antiguas cada 24 horas.
+     * Limpia solicitudes automáticas antiguas cada 1 hora.
      * Mantiene la tabla solicitudes_ubicacion ligera eliminando solo las de rastreo
      * automático (cada 60 segundos).
      */
-    @Scheduled(fixedRate = 86400000) // cada 24 horas
+    @Scheduled(fixedRate = 3600000) // cada 1 hora
     public void limpiarSolicitudesAutomaticasAntiguas() {
         try {
             int eliminadas = geolocalizacionService.eliminarSolicitudesAutomaticasAntiguas();
