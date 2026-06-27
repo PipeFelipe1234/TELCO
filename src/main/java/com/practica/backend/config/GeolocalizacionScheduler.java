@@ -85,10 +85,10 @@ public class GeolocalizacionScheduler {
         try {
             int eliminadas = geolocalizacionService.eliminarSolicitudesAutomaticasAntiguas();
             if (eliminadas > 0) {
-                logger.info("🧹 Scheduler diario: {} solicitudes automáticas eliminadas", eliminadas);
+                logger.info("🧹 Scheduler horario: {} solicitudes automáticas eliminadas", eliminadas);
             }
         } catch (Exception e) {
-            logger.error("❌ Error en limpieza diaria de solicitudes automáticas: {}", e.getMessage());
+            logger.error("❌ Error en limpieza horaria de solicitudes automáticas: {}", e.getMessage());
         }
     }
 }

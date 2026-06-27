@@ -24,6 +24,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
 @Service
 public class RegistroService {
@@ -35,6 +37,8 @@ public class RegistroService {
     private final RastreoZonaService rastreoZonaService;
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
     private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
+    private static final long VENTANA_DUPLICADO_MINUTOS = 5;
+    private static final double UMBRAL_COORD_DUPLICADO = 0.0001d;
 
     public RegistroService(RegistroRepository registroRepository,
             RegistroReporteRepository registroReporteRepository,
@@ -193,6 +197,14 @@ public class RegistroService {
             fechaHoraReporte = LocalDateTime.now(ZONA_COLOMBIA);
         }
 
+        Optional<RegistroReporte> ultimoReporteOpt = registroReporteRepository
+                .findTopByRegistroOrderByFechaHoraDesc(registro);
+        if (ultimoReporteOpt.isPresent()
+                && esReporteDuplicado(ultimoReporteOpt.get(), request, fechaHoraReporte)) {
+            // No persistimos ni notificamos cuando llega el mismo reporte repetido.
+            return mapToResponse(registro);
+        }
+
         String ubicacion = request.ubicacion();
         if ((ubicacion == null || ubicacion.trim().isEmpty())
                 && request.latitud() != null
@@ -221,6 +233,69 @@ public class RegistroService {
         enviarNotificacionReporte(guardado);
 
         return mapToResponse(guardado);
+    }
+
+    private boolean esReporteDuplicado(
+            RegistroReporte ultimoReporte,
+            AgregarReporteRequest request,
+            LocalDateTime fechaHoraReporte) {
+        if (ultimoReporte.getFechaHora() == null || fechaHoraReporte == null) {
+            return false;
+        }
+
+        long diferenciaMinutos = Math.abs(Duration.between(ultimoReporte.getFechaHora(), fechaHoraReporte).toMinutes());
+        if (diferenciaMinutos > VENTANA_DUPLICADO_MINUTOS) {
+            return false;
+        }
+
+        boolean mismaFoto = Objects.equals(normalizarPicture(ultimoReporte.getPicture()),
+                normalizarPicture(request.picture()));
+        boolean mismoTexto = Objects.equals(normalizarTexto(ultimoReporte.getReporte()),
+                normalizarTexto(request.reporte()));
+        boolean mismasCoords = sonCoordenadasSimilares(
+                ultimoReporte.getLatitud(),
+                ultimoReporte.getLongitud(),
+                request.latitud(),
+                request.longitud());
+
+        // Solo bloqueamos cuando el payload completo es esencialmente el mismo.
+        return mismaFoto && mismoTexto && mismasCoords;
+    }
+
+    private String normalizarTexto(String valor) {
+        if (valor == null) {
+            return null;
+        }
+        String limpio = valor.trim();
+        return limpio.isEmpty() ? null : limpio;
+    }
+
+    private String normalizarPicture(String picture) {
+        String normalizado = normalizarTexto(picture);
+        if (normalizado == null) {
+            return null;
+        }
+
+        int queryIndex = normalizado.indexOf('?');
+        if (queryIndex >= 0) {
+            normalizado = normalizado.substring(0, queryIndex);
+        }
+
+        int fragmentIndex = normalizado.indexOf('#');
+        if (fragmentIndex >= 0) {
+            normalizado = normalizado.substring(0, fragmentIndex);
+        }
+
+        return normalizado;
+    }
+
+    private boolean sonCoordenadasSimilares(Double latA, Double lonA, Double latB, Double lonB) {
+        if (latA == null || lonA == null || latB == null || lonB == null) {
+            return false;
+        }
+
+        return Math.abs(latA - latB) <= UMBRAL_COORD_DUPLICADO
+                && Math.abs(lonA - lonB) <= UMBRAL_COORD_DUPLICADO;
     }
 
     public List<RegistroResponse> obtenerMisRegistros(Usuario usuario) {
