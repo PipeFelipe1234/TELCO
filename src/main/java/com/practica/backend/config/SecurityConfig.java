@@ -25,6 +25,7 @@ public class SecurityConfig {
                         // PUBLICOS
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/usuarios").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/cloudinary/config").permitAll()
 
                         // USUARIOS AUTENTICADOS
                         .requestMatchers(HttpMethod.PUT, "/api/usuarios/**").authenticated()
