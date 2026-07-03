@@ -48,14 +48,18 @@ public class GeocodingService {
      */
     public String obtenerDireccion(Double latitud, Double longitud) {
         if (latitud == null || longitud == null) {
+            logger.warn("⚠️ Reverse geocoding omitido: coordenadas incompletas lat={}, lon={}", latitud, longitud);
             return null;
         }
 
         String cacheKey = buildCacheKey(latitud, longitud);
         String cached = getFromCache(cacheKey);
         if (cached != null) {
+            logger.info("🗂️ Reverse geocoding CACHE HIT para key={} -> {}", cacheKey, cached);
             return cached;
         }
+
+        logger.info("🗂️ Reverse geocoding CACHE MISS para key={}", cacheKey);
 
         // Si no hay API key configurada, retornar coordenadas
         if (apiKey == null || apiKey.trim().isEmpty()) {
@@ -72,7 +76,7 @@ public class GeocodingService {
                     .build()
                     .toUriString();
 
-            logger.info("📍 Reverse geocoding para: {}, {}", latitud, longitud);
+            logger.info("🌐 Reverse geocoding GOOGLE API request para lat={}, lon={}", latitud, longitud);
 
             String response = restTemplate.getForObject(url, String.class);
             JsonNode root = objectMapper.readTree(response);
@@ -85,17 +89,17 @@ public class GeocodingService {
                     String direccion = results.get(0).path("formatted_address").asText();
                     // Quitar ", Colombia" del final ya que se sobreentiende
                     direccion = quitarPais(direccion);
-                    logger.info("✅ Dirección obtenida: {}", direccion);
+                    logger.info("✅ Reverse geocoding GOOGLE API success -> {}", direccion);
                     putInCache(cacheKey, direccion);
                     return direccion;
                 }
             } else if ("ZERO_RESULTS".equals(status)) {
-                logger.warn("⚠️ Sin resultados para las coordenadas: {}, {}", latitud, longitud);
+                logger.warn("⚠️ Reverse geocoding GOOGLE API sin resultados para lat={}, lon={}", latitud, longitud);
                 String fallback = formatearCoordenadas(latitud, longitud);
                 putInCache(cacheKey, fallback);
                 return fallback;
             } else {
-                logger.error("❌ Error en Geocoding API. Status: {}", status);
+                logger.error("❌ Reverse geocoding GOOGLE API error. Status: {}", status);
                 String fallback = formatearCoordenadas(latitud, longitud);
                 putInCache(cacheKey, fallback);
                 return fallback;
@@ -106,6 +110,8 @@ public class GeocodingService {
         }
 
         String fallback = formatearCoordenadas(latitud, longitud);
+        logger.warn("↩️ Reverse geocoding fallback a coordenadas para lat={}, lon={} -> {}", latitud, longitud,
+                fallback);
         putInCache(cacheKey, fallback);
         return fallback;
     }

@@ -146,28 +146,52 @@ public class GeolocalizacionService {
             solicitud.setLongitud(request.longitud());
             solicitud.setPrecisionMetros(request.precisionMetros());
 
+            boolean esAutomatica = Boolean.TRUE.equals(solicitud.getEsAutomatica());
+            boolean ubicacionProvistaPorFrontend = request.ubicacion() != null && !request.ubicacion().trim().isEmpty();
+
             // 📍 Reverse geocoding:
             // - Si el frontend envía ubicación la usamos
             // - Si es solicitud automática, NO llamar Google (control de costos)
             // - Si es manual y no viene ubicación, llamar Google API
             String ubicacion = request.ubicacion();
             if (ubicacion == null || ubicacion.trim().isEmpty()) {
-                if (Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+                if (esAutomatica) {
+                    logger.info(
+                            "🧭 Solicitud {} AUTOMATICA sin ubicacion frontend. Reverse geocoding OMITIDO. Se guardan coordenadas lat={}, lon={}",
+                            solicitud.getId(),
+                            request.latitud(),
+                            request.longitud());
                     ubicacion = String.format("Lat: %.6f, Lon: %.6f", request.latitud(), request.longitud());
                 } else {
+                    logger.info(
+                            "🧭 Solicitud {} MANUAL sin ubicacion frontend. Reverse geocoding EJECUTADO para lat={}, lon={}",
+                            solicitud.getId(),
+                            request.latitud(),
+                            request.longitud());
                     ubicacion = geocodingService.obtenerDireccion(
                             request.latitud(),
                             request.longitud());
                 }
+            } else {
+                logger.info(
+                        "🧭 Solicitud {} {} con ubicacion provista por frontend. Reverse geocoding OMITIDO. Ubicacion='{}'",
+                        solicitud.getId(),
+                        esAutomatica ? "AUTOMATICA" : "MANUAL",
+                        ubicacion);
             }
             solicitud.setUbicacion(ubicacion);
             solicitud.setEstado("RESPONDIDA");
             solicitudRepository.save(solicitud);
 
-            logger.info("✅ Solicitud {} respondida exitosamente", request.solicitudId());
+            logger.info(
+                    "✅ Solicitud {} respondida exitosamente. tipo={}, reverseGeocoding={}, ubicacionFrontend={}",
+                    request.solicitudId(),
+                    esAutomatica ? "AUTOMATICA" : "MANUAL",
+                    !esAutomatica && !ubicacionProvistaPorFrontend,
+                    ubicacionProvistaPorFrontend);
 
             // 📍 Si es solicitud automática, procesar rastreo de zona
-            if (Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+            if (esAutomatica) {
                 try {
                     rastreoZonaService.procesarUbicacion(empleado, request.latitud(), request.longitud());
                 } catch (Exception e) {
@@ -177,7 +201,7 @@ public class GeolocalizacionService {
 
             // Notificar al admin que ya tiene la ubicación (solo si NO es automática para
             // evitar spam)
-            if (!Boolean.TRUE.equals(solicitud.getEsAutomatica())) {
+            if (!esAutomatica) {
                 String ubicacionTexto = ubicacion != null
                         ? ubicacion
                         : String.format("Lat: %.6f, Lon: %.6f", request.latitud(), request.longitud());
