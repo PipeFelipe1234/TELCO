@@ -105,4 +105,7 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
         // salida)
         @Query("SELECT r FROM Registro r WHERE r.horaSalida IS NULL ORDER BY r.fecha DESC, r.horaEntrada DESC")
         List<Registro> findAllRegistrosEnTurno();
+
+        // ⏰ OBTENER REGISTROS ABIERTOS DE UN DÍA ESPECÍFICO
+        List<Registro> findByFechaAndHoraSalidaIsNull(LocalDate fecha);
 }
