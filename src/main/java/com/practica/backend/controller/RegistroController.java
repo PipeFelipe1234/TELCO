@@ -53,6 +53,10 @@ public class RegistroController {
 
                 Usuario usuario = usuarioService.obtenerPorIdentificacion(identificacion);
 
+                logger.info("📥 marcarEntrada usuario={} fechaCreacion={} lat={} lon={} precision={}",
+                                usuario.getNombre(), request.fechaCreacion(), request.latitudCheckin(),
+                                request.longitudCheckin(), request.precisionMetrosCheckin());
+
                 return ResponseEntity.ok(registroService.marcarEntrada(usuario, request));
         }
 
@@ -69,6 +73,9 @@ public class RegistroController {
 
                         Usuario usuario = usuarioService.obtenerPorIdentificacion(identificacion);
                         logger.info("📤 Usuario encontrado: {}", usuario.getNombre());
+                        logger.info("📤 marcarSalida payload fechaCreacion={} lat={} lon={} precision={}",
+                                        request.fechaCreacion(), request.latitud(), request.longitud(),
+                                        request.precisionMetros());
 
                         RegistroResponse response = registroService.marcarSalida(usuario, request);
                         logger.info("✅ Salida registrada exitosamente para: {}", usuario.getNombre());
@@ -88,6 +95,11 @@ public class RegistroController {
                                 .getName();
 
                 Usuario usuario = usuarioService.obtenerPorIdentificacion(identificacion);
+
+                logger.info("📝 agregarReporte usuario={} fechaCreacion={} lat={} lon={} precision={} novedadId={} picturePresent={}",
+                                usuario.getNombre(), request.fechaCreacion(), request.latitud(), request.longitud(),
+                                request.precisionMetros(), request.novedadId(),
+                                request.picture() != null && !request.picture().trim().isEmpty());
 
                 return ResponseEntity.ok(registroService.agregarReporte(usuario, request));
         }

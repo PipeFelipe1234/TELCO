@@ -10,11 +10,15 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.io.IOException;
 
 public class JwtFilter extends OncePerRequestFilter {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtFilter.class);
 
     @Override
     protected void doFilterInternal(
@@ -26,10 +30,9 @@ public class JwtFilter extends OncePerRequestFilter {
         String requestURI = request.getRequestURI();
         String method = request.getMethod();
 
-        // Log detallado para endpoints de salida
-        if (requestURI.contains("salida")) {
-            System.out.println("🔍 [JwtFilter] " + method + " " + requestURI);
-            System.out.println("🔍 [JwtFilter] Auth header present: " + (authHeader != null));
+        // Log útil para sincronización offline y endpoints sensibles
+        if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")) {
+            logger.info("🔐 [JwtFilter] {} {} authHeaderPresent={}", method, requestURI, authHeader != null);
         }
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -52,21 +55,22 @@ public class JwtFilter extends OncePerRequestFilter {
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                    if (requestURI.contains("salida")) {
-                        System.out.println("✅ [JwtFilter] Usuario autenticado: " + identificacion + " con rol: " + rol);
+                    if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")) {
+                        logger.info("✅ [JwtFilter] Usuario autenticado: {} rol={} endpoint={}", identificacion, rol,
+                                requestURI);
                     }
                 } else {
-                    System.out.println("⚠️ [JwtFilter] Token sin identificación para: " + requestURI);
+                    logger.warn("⚠️ [JwtFilter] Token sin identificación para: {}", requestURI);
                 }
             } catch (ExpiredJwtException e) {
-                System.out.println("⛔ [JwtFilter] Token EXPIRADO para: " + requestURI);
+                logger.warn("⛔ [JwtFilter] Token EXPIRADO para: {}", requestURI);
             } catch (JwtException e) {
-                System.out.println("⛔ [JwtFilter] Token inválido: " + e.getMessage() + " para: " + requestURI);
+                logger.warn("⛔ [JwtFilter] Token inválido para {}: {}", requestURI, e.getMessage());
             } catch (Exception e) {
-                System.out.println("⛔ [JwtFilter] Error: " + e.getMessage() + " para: " + requestURI);
+                logger.error("⛔ [JwtFilter] Error en validación JWT para {}: {}", requestURI, e.getMessage());
             }
-        } else if (requestURI.contains("salida")) {
-            System.out.println("⚠️ [JwtFilter] Sin header Authorization para: " + requestURI);
+        } else if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")) {
+            logger.warn("⚠️ [JwtFilter] Sin header Authorization para: {}", requestURI);
         }
 
         filterChain.doFilter(request, response);
