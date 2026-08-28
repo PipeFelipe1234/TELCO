@@ -37,7 +37,7 @@ public class RegistroReporte {
     private Boolean esSalida = false;
 
     @Column(name = "novedad_id")
-    private Integer novedadId;
+    private Long novedadId;
 
     public Long getId() {
         return id;
@@ -119,11 +119,11 @@ public class RegistroReporte {
         this.esSalida = esSalida;
     }
 
-    public Integer getNovedadId() {
+    public Long getNovedadId() {
         return novedadId;
     }
 
-    public void setNovedadId(Integer novedadId) {
+    public void setNovedadId(Long novedadId) {
         this.novedadId = novedadId;
     }
 }

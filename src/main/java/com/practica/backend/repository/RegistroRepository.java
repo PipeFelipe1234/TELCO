@@ -35,7 +35,7 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
                         @Param("fecha") LocalDate fecha,
                         @Param("identificacion") String identificacion,
                         @Param("nombres") String nombres,
-                        @Param("novedadId") Integer novedadId);
+                        @Param("novedadId") Long novedadId);
 
         // 📅 OBTENER REGISTROS POR RANGO DE FECHAS
         @Query("SELECT r FROM Registro r WHERE r.fecha >= :fechaInicio AND r.fecha <= :fechaFin ORDER BY r.fecha ASC, r.horaEntrada ASC")

@@ -461,7 +461,7 @@ public class RegistroService {
             String ubicacion,
             LocalDateTime fechaHora,
             boolean esSalida,
-            Integer novedadId) {
+            Long novedadId) {
         RegistroReporte reporteTurno = new RegistroReporte();
         reporteTurno.setRegistro(registro);
         reporteTurno.setLatitud(latitud);
