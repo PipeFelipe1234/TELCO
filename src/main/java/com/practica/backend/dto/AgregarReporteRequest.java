@@ -10,7 +10,5 @@ public record AgregarReporteRequest(
         String picture,
         String ubicacion,
         @JsonProperty("fechaCreacion") String fechaCreacion,
-        Integer novedadId) {
+        Long novedadId) {
 }
-Long novedadId)
-{
