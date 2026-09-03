@@ -1,9 +1,10 @@
 package com.practica.backend.dto;
 
+import java.time.LocalDateTime;
+
 public record ReporteTurnoResponse(
         Long id,
-        String fechaHora,
-        String fechaHoraColombia,
+        LocalDateTime fechaHora,
         Double latitud,
         Double longitud,
         Double precisionMetros,
