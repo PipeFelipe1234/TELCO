@@ -477,9 +477,11 @@ public class RegistroService {
     }
 
     private ReporteTurnoResponse mapReporteToResponse(RegistroReporte reporte) {
+        String fechaHoraColombia = formatearFechaHoraColombia(reporte.getFechaHora());
         return new ReporteTurnoResponse(
                 reporte.getId(),
-                reporte.getFechaHora(),
+                fechaHoraColombia,
+                fechaHoraColombia,
                 reporte.getLatitud(),
                 reporte.getLongitud(),
                 reporte.getPrecisionMetros(),
@@ -488,6 +490,13 @@ public class RegistroService {
                 reporte.getUbicacion(),
                 reporte.getEsSalida(),
                 reporte.getNovedadId());
+    }
+
+    private String formatearFechaHoraColombia(LocalDateTime fechaHora) {
+        if (fechaHora == null) {
+            return null;
+        }
+        return fechaHora.atZone(ZONA_COLOMBIA).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
     }
 
     // 📲 NOTIFICACIÓN DE ENTRADA
