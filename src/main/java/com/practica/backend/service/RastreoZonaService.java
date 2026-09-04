@@ -52,7 +52,7 @@ public class RastreoZonaService {
     private static final int TIEMPO_LIMITE_DEFECTO = 10; // Minutos por defecto si el usuario no tiene límite
 
     // Radio en metros para considerar que es la misma residencia
-    private static final double RADIO_RESIDENCIA_METROS = 100.0;
+    private static final double RADIO_RESIDENCIA_METROS = 15.0;
 
     private final RastreoZonaRepository rastreoRepository;
     private final RegistroRepository registroRepository;
