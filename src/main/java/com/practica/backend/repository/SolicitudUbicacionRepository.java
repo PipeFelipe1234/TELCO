@@ -87,6 +87,11 @@ public interface SolicitudUbicacionRepository extends JpaRepository<SolicitudUbi
         @Query("DELETE FROM SolicitudUbicacion s WHERE MONTH(s.fechaSolicitud) = :mes AND YEAR(s.fechaSolicitud) = :anio")
         int deleteByMesYAnio(@Param("mes") int mes, @Param("anio") int anio);
 
+        @Modifying
+        @Transactional
+        @Query("DELETE FROM SolicitudUbicacion s WHERE s.fechaSolicitud < :fechaLimite")
+        int deleteByFechaAnteriorA(@Param("fechaLimite") LocalDateTime fechaLimite);
+
         // Eliminar solicitudes AUTOMÁTICAS más antiguas que una fecha límite
         @Modifying
         @Transactional

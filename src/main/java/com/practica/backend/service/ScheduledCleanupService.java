@@ -3,6 +3,7 @@ package com.practica.backend.service;
 import com.practica.backend.dto.CleanupInfoResponse;
 import com.practica.backend.entity.Registro;
 import com.practica.backend.repository.RegistroRepository;
+import com.practica.backend.repository.RegistroReporteRepository;
 import com.practica.backend.repository.SolicitudUbicacionRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class ScheduledCleanupService {
     private static final LocalTime HORA_CIERRE_AUTOMATICO = LocalTime.of(23, 55);
 
     private final RegistroRepository registroRepository;
+    private final RegistroReporteRepository registroReporteRepository;
     private final SolicitudUbicacionRepository solicitudRepository;
     private final NotificacionService notificacionService;
     private static final Locale LOCALE_ES = new Locale("es", "ES");
@@ -50,9 +52,11 @@ public class ScheduledCleanupService {
 
     public ScheduledCleanupService(
             RegistroRepository registroRepository,
+            RegistroReporteRepository registroReporteRepository,
             SolicitudUbicacionRepository solicitudRepository,
             NotificacionService notificacionService) {
         this.registroRepository = registroRepository;
+        this.registroReporteRepository = registroReporteRepository;
         this.solicitudRepository = solicitudRepository;
         this.notificacionService = notificacionService;
     }
@@ -115,40 +119,29 @@ public class ScheduledCleanupService {
     }
 
     /**
-     * Tarea programada que se ejecuta todos los días a las 00:05 AM
-     * Verifica si hay registros y geolocalizaciones que deben ser eliminados
+     * Conserva los registros del mes actual y del mes anterior.
+     * Se ejecuta diariamente para recuperar limpiezas que no pudieron correr el día
+     * 1.
      */
-    @Scheduled(cron = "0 5 0 * * *") // Todos los días a las 00:05
+    @Scheduled(cron = "0 5 0 * * *", zone = "America/Bogota")
+    @Transactional
     public void ejecutarLimpiezaAutomatica() {
-        LocalDate hoy = LocalDate.now();
-
-        // Calcular el mes que debe ser eliminado (2 meses atrás)
-        LocalDate mesAEliminar = hoy.minusMonths(2);
-        int mes = mesAEliminar.getMonthValue();
-        int anio = mesAEliminar.getYear();
-
-        // Solo ejecutar el primer día del mes
-        if (hoy.getDayOfMonth() != 1) {
-            return;
-        }
-
-        String nombreMes = getNombreMes(mes);
+        LocalDate hoy = LocalDate.now(ZONA_COLOMBIA);
+        LocalDate fechaLimite = hoy.withDayOfMonth(1).minusMonths(1);
+        LocalDateTime fechaLimiteGeolocalizaciones = fechaLimite.atStartOfDay();
         StringBuilder mensajeNotificacion = new StringBuilder();
         boolean hayEliminaciones = false;
 
-        // Verificar y eliminar registros de asistencia
-        long cantidadRegistros = registroRepository.countByMesYAnio(mes, anio);
-        if (cantidadRegistros > 0) {
-            int eliminadosRegistros = registroRepository.deleteByMesYAnio(mes, anio);
+        int eliminadosReportes = registroReporteRepository.deleteByRegistroFechaAnteriorA(fechaLimite);
+        int eliminadosRegistros = registroRepository.deleteByFechaAnteriorA(fechaLimite);
+        if (eliminadosRegistros > 0 || eliminadosReportes > 0) {
             mensajeNotificacion.append("Se eliminaron ").append(eliminadosRegistros)
-                    .append(" registros de asistencia");
+                    .append(" registros de asistencia y ").append(eliminadosReportes).append(" reportes asociados");
             hayEliminaciones = true;
         }
 
-        // Verificar y eliminar geolocalizaciones
-        long cantidadGeolocalizaciones = solicitudRepository.countByMesYAnio(mes, anio);
-        if (cantidadGeolocalizaciones > 0) {
-            int eliminadosGeo = solicitudRepository.deleteByMesYAnio(mes, anio);
+        int eliminadosGeo = solicitudRepository.deleteByFechaAnteriorA(fechaLimiteGeolocalizaciones);
+        if (eliminadosGeo > 0) {
             if (hayEliminaciones) {
                 mensajeNotificacion.append(" y ");
             } else {
@@ -160,12 +153,19 @@ public class ScheduledCleanupService {
 
         // Enviar notificación si hubo eliminaciones
         if (hayEliminaciones) {
-            mensajeNotificacion.append(" del mes de ").append(nombreMes).append(" ").append(anio)
-                    .append(". Recuerde exportar sus datos antes de que sean eliminados.");
+            mensajeNotificacion.append(" anteriores al ")
+                    .append(fechaLimite.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                    .append(".");
+
+            logger.info(
+                    "Limpieza automática completada. Límite: {}, reportes: {}, registros: {}, geolocalizaciones: {}",
+                    fechaLimite, eliminadosReportes, eliminadosRegistros, eliminadosGeo);
 
             notificacionService.enviarNotificacionATodos(
                     "Limpieza automática completada",
                     mensajeNotificacion.toString());
+        } else {
+            logger.info("Limpieza automática sin datos anteriores al {}", fechaLimite);
         }
     }
 
@@ -319,7 +319,9 @@ public class ScheduledCleanupService {
      * Fuerza la eliminación de un mes específico (solo para ADMIN)
      * Útil para pruebas o eliminación manual
      */
+    @Transactional
     public int forzarEliminacionMes(int mes, int anio) {
+        registroReporteRepository.deleteByRegistroMesYAnio(mes, anio);
         return registroRepository.deleteByMesYAnio(mes, anio);
     }
 }
