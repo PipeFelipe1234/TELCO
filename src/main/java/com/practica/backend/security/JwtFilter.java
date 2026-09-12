@@ -30,9 +30,10 @@ public class JwtFilter extends OncePerRequestFilter {
         String requestURI = request.getRequestURI();
         String method = request.getMethod();
 
-        // Log útil para sincronización offline y endpoints sensibles
+        // Log útil para sincronización offline y endpoints sensibles (nivel DEBUG para
+        // evitar flood de logs)
         if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")) {
-            logger.info("🔐 [JwtFilter] {} {} authHeaderPresent={}", method, requestURI, authHeader != null);
+            logger.debug("🔐 [JwtFilter] {} {} authHeaderPresent={}", method, requestURI, authHeader != null);
         }
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {

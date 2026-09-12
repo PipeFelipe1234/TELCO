@@ -434,7 +434,7 @@ public class GeolocalizacionService {
             return 0;
         }
 
-        logger.info("🤖 Iniciando rastreo automático: {} empleados en turno", registrosEnTurno.size());
+        logger.debug("🤖 Iniciando rastreo automático: {} empleados en turno", registrosEnTurno.size());
 
         // Obtener el primer admin del sistema para asignar las solicitudes automáticas
         List<Usuario> admins = usuarioRepository.findByRolOrderByIdAsc("ADMIN");
@@ -465,7 +465,7 @@ public class GeolocalizacionService {
 
                 if (enviada) {
                     solicitudesEnviadas++;
-                    logger.info("🤖 Solicitud automática #{} enviada a: {}", solicitud.getId(), empleado.getNombre());
+                    logger.debug("🤖 Solicitud automática #{} enviada a: {}", solicitud.getId(), empleado.getNombre());
                 } else {
                     logger.warn("⚠️ No se pudo enviar notificación automática a: {} (sin dispositivos)",
                             empleado.getNombre());
@@ -475,7 +475,7 @@ public class GeolocalizacionService {
             }
         }
 
-        logger.info("🤖 Rastreo automático completado: {} solicitudes enviadas de {} empleados en turno",
+        logger.debug("🤖 Rastreo automático completado: {} solicitudes enviadas de {} empleados en turno",
                 solicitudesEnviadas, registrosEnTurno.size());
 
         return solicitudesEnviadas;

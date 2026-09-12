@@ -84,7 +84,7 @@ public class RastreoZonaService {
      */
     @Transactional
     public RastreoZonaResponse procesarUbicacion(Usuario empleado, double latitud, double longitud) {
-        logger.info("📍 Procesando ubicación de {} en ({}, {})", empleado.getNombre(), latitud, longitud);
+        logger.debug("📍 Procesando ubicación de {} en ({}, {})", empleado.getNombre(), latitud, longitud);
 
         // Cargar el usuario con sus zonas asignadas (evitar problemas de LAZY loading)
         Usuario empleadoConZonas = usuarioRepository.findById(empleado.getId())

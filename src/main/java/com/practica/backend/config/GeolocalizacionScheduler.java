@@ -39,7 +39,7 @@ public class GeolocalizacionScheduler {
         try {
             int expiradas = geolocalizacionService.expirarSolicitudesAntiguas();
             if (expiradas > 0) {
-                logger.info("⏰ Scheduler: {} solicitudes expiradas", expiradas);
+                logger.debug("⏰ Scheduler: {} solicitudes expiradas", expiradas);
             }
         } catch (Exception e) {
             logger.error("❌ Error en scheduler de expiración: {}", e.getMessage());
@@ -66,9 +66,10 @@ public class GeolocalizacionScheduler {
             }
 
             int enviadas = geolocalizacionService.enviarSolicitudesAutomaticas();
-            // Solo loguear si hubo solicitudes enviadas
+            // Solo loguear si hubo solicitudes enviadas (nivel DEBUG para evitar rate limit
+            // en Railway)
             if (enviadas > 0) {
-                logger.info("🤖 Scheduler: {} solicitudes automáticas enviadas", enviadas);
+                logger.debug("🤖 Scheduler: {} solicitudes automáticas enviadas", enviadas);
             }
         } catch (Exception e) {
             logger.error("❌ Error en scheduler de rastreo automático: {}", e.getMessage());

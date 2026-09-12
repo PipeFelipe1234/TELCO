@@ -171,9 +171,9 @@ public class ScheduledCleanupService {
 
     /**
      * Tarea programada para enviar advertencias
-     * Se ejecuta todos los días a las 09:00 AM
+     * Se ejecuta todos los días a las 09:00 AM hora Colombia
      */
-    @Scheduled(cron = "0 0 9 * * *") // Todos los días a las 09:00
+    @Scheduled(cron = "0 0 9 * * *", zone = "America/Bogota") // Todos los días a las 09:00 AM Colombia
     public void enviarAdvertenciasEliminacion() {
         CleanupInfoResponse info = obtenerInfoLimpieza();
 
@@ -188,7 +188,7 @@ public class ScheduledCleanupService {
      * Obtiene información sobre la próxima limpieza automática
      */
     public CleanupInfoResponse obtenerInfoLimpieza() {
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = LocalDate.now(ZONA_COLOMBIA);
 
         // El primer día del próximo mes es cuando se ejecuta la eliminación
         LocalDate fechaEliminacion = hoy.withDayOfMonth(1).plusMonths(1);

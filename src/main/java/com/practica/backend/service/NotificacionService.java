@@ -8,6 +8,8 @@ import com.practica.backend.entity.TokenDispositivo;
 import com.practica.backend.entity.Usuario;
 import com.practica.backend.repository.TokenDispositivoRepository;
 import com.practica.backend.repository.UsuarioRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +18,8 @@ import java.util.stream.Stream;
 
 @Service
 public class NotificacionService {
+
+    private static final Logger logger = LoggerFactory.getLogger(NotificacionService.class);
 
     private final TokenDispositivoRepository tokenDispositivoRepository;
     private final UsuarioRepository usuarioRepository;
@@ -46,9 +50,9 @@ public class NotificacionService {
                     .build();
 
             String messageId = FirebaseMessaging.getInstance().send(message);
-            System.out.println("✅ Notificación enviada correctamente: " + messageId);
+            logger.debug("✅ Notificación enviada correctamente: {}", messageId);
         } catch (Exception e) {
-            System.err.println("❌ Error al enviar notificación: " + e.getMessage());
+            logger.error("❌ Error al enviar notificación: {}", e.getMessage());
         }
     }
 
@@ -63,7 +67,7 @@ public class NotificacionService {
         List<TokenDispositivo> tokens = tokenDispositivoRepository.findTokensActivosByUsuario(usuario);
 
         if (tokens.isEmpty()) {
-            System.out.println("⚠️  El usuario " + usuario.getNombre() + " no tiene dispositivos registrados");
+            logger.debug("⚠️ El usuario {} no tiene dispositivos registrados", usuario.getNombre());
             return;
         }
 
@@ -114,7 +118,7 @@ public class NotificacionService {
                 .toList();
 
         if (tokenList.isEmpty()) {
-            System.out.println("⚠️  No hay admins con dispositivos registrados para cargo: " + cargoEmpleado);
+            logger.debug("⚠️ No hay admins con dispositivos registrados para cargo: {}", cargoEmpleado);
             return;
         }
 
@@ -128,28 +132,16 @@ public class NotificacionService {
             String titulo,
             String mensaje,
             Map<String, String> datos) {
-        System.out.println("📤 Buscando tokens de ADMINs para enviar notificación...");
-        System.out.println("   Título: " + titulo);
-        System.out.println("   Mensaje: " + mensaje);
-
         List<TokenDispositivo> tokensAdmins = tokenDispositivoRepository.findTokensActivosAdmins();
 
         if (tokensAdmins.isEmpty()) {
-            System.out.println("⚠️  No hay ADMINs con dispositivos registrados");
+            logger.debug("⚠️ No hay ADMINs con dispositivos registrados");
             return;
         }
-
-        System.out.println("📱 Encontrados " + tokensAdmins.size() + " dispositivo(s) de ADMIN");
 
         List<String> tokenList = tokensAdmins.stream()
                 .map(TokenDispositivo::getToken)
                 .toList();
-
-        // Log de tokens (parcial por seguridad)
-        for (int i = 0; i < tokenList.size(); i++) {
-            String token = tokenList.get(i);
-            System.out.println("   Token " + (i + 1) + ": " + token.substring(0, Math.min(30, token.length())) + "...");
-        }
 
         enviarNotificacionAMultiplesDispositivos(tokenList, titulo, mensaje, datos);
     }
@@ -164,12 +156,9 @@ public class NotificacionService {
             Map<String, String> datos) {
         try {
             if (tokens.isEmpty()) {
-                System.out.println("⚠️  Lista de tokens vacía, no se envían notificaciones");
+                logger.debug("⚠️ Lista de tokens vacía, no se envían notificaciones");
                 return;
             }
-
-            System.out.println("📤 Enviando notificación a " + tokens.size() + " dispositivo(s)...");
-            System.out.println("   Firebase App inicializado: " + !com.google.firebase.FirebaseApp.getApps().isEmpty());
 
             // Crear lista de mensajes individuales (API HTTP v1)
             List<Message> messages = new ArrayList<>();
@@ -189,17 +178,15 @@ public class NotificacionService {
             // Usar sendEach en lugar de sendMulticast (API v1)
             BatchResponse response = FirebaseMessaging.getInstance().sendEach(messages);
 
-            System.out.println("✅ Notificaciones enviadas: " + response.getSuccessCount() +
-                    " exitosas, " + response.getFailureCount() + " fallidas");
+            logger.debug("✅ Notificaciones enviadas: {} exitosas, {} fallidas",
+                    response.getSuccessCount(), response.getFailureCount());
 
             // Procesar tokens fallidos
             if (response.getFailureCount() > 0) {
                 procesarTokensFallidos(response, tokens);
             }
         } catch (Exception e) {
-            System.err.println("❌ Error al enviar notificaciones: " + e.getMessage());
-            System.err.println("   Tipo de excepción: " + e.getClass().getName());
-            e.printStackTrace();
+            logger.error("❌ Error al enviar notificaciones: {}", e.getMessage());
         }
     }
 
@@ -212,32 +199,21 @@ public class NotificacionService {
             if (!sendResponse.isSuccessful()) {
                 String token = tokens.get(i);
 
-                // Obtener el error específico de Firebase
-                String errorMessage = "Desconocido";
                 String errorCode = "UNKNOWN";
-                if (sendResponse.getException() != null) {
-                    errorMessage = sendResponse.getException().getMessage();
-                    if (sendResponse.getException().getMessagingErrorCode() != null) {
-                        errorCode = sendResponse.getException().getMessagingErrorCode().name();
-                    }
+                if (sendResponse.getException() != null
+                        && sendResponse.getException().getMessagingErrorCode() != null) {
+                    errorCode = sendResponse.getException().getMessagingErrorCode().name();
                 }
 
-                System.err
-                        .println("❌ Error FCM para token " + token.substring(0, Math.min(30, token.length())) + "...");
-                System.err.println("   Código de error: " + errorCode);
-                System.err.println("   Mensaje: " + errorMessage);
-
-                // Solo desactivar si es un error de token inválido/no registrado
                 final String finalErrorCode = errorCode;
                 if ("UNREGISTERED".equals(errorCode) || "INVALID_ARGUMENT".equals(errorCode)) {
                     tokenDispositivoRepository.findByToken(token).ifPresent(td -> {
                         td.setActivo(false);
                         tokenDispositivoRepository.save(td);
-                        System.out.println("🗑️  Token inactivado por error: " + finalErrorCode);
+                        logger.warn("🗑️ Token inactivado por error: {}", finalErrorCode);
                     });
                 } else {
-                    // Para otros errores (temporales), no desactivar el token
-                    System.out.println("⚠️  Token NO inactivado (error posiblemente temporal): " + errorCode);
+                    logger.debug("⚠️ Token NO inactivado (error posiblemente temporal): {}", errorCode);
                 }
             }
         }
@@ -249,39 +225,27 @@ public class NotificacionService {
     public void registrarTokenDispositivo(Usuario usuario, String token, String tipoDispositivo,
             String marca, String modelo) {
         try {
-            System.out.println("📱 Intentando registrar token FCM para usuario: " + usuario.getNombre() + " (Rol: "
-                    + usuario.getRol() + ")");
-            System.out.println(
-                    "   Token: " + (token != null ? token.substring(0, Math.min(30, token.length())) + "..." : "NULL"));
-            System.out.println("   Tipo: " + tipoDispositivo + ", Marca: " + marca + ", Modelo: " + modelo);
-
             if (token == null || token.isEmpty()) {
-                System.err.println("❌ El token FCM está vacío o es null");
+                logger.warn("❌ El token FCM está vacío o es null para usuario {}", usuario.getNombre());
                 return;
             }
 
             // Verificar si el token ya existe
             var existente = tokenDispositivoRepository.findByToken(token);
             if (existente.isPresent()) {
-                // Actualizar última actividad del token existente
                 TokenDispositivo td = existente.get();
                 td.setUltimaActividad(java.time.LocalDateTime.now());
                 td.setActivo(true);
                 tokenDispositivoRepository.save(td);
-                System.out.println("ℹ️  Token ya existía, actualizada última actividad");
+                logger.debug("ℹ️ Token ya existía para {}, actualizada última actividad", usuario.getNombre());
                 return;
             }
 
             TokenDispositivo nuevoToken = new TokenDispositivo(usuario, token, tipoDispositivo, marca, modelo);
             tokenDispositivoRepository.save(nuevoToken);
-            System.out.println("✅ Token FCM registrado exitosamente para: " + usuario.getNombre());
-
-            // Mostrar cuántos tokens de admin hay ahora
-            long totalAdmins = tokenDispositivoRepository.findTokensActivosAdmins().size();
-            System.out.println("📊 Total tokens de ADMINs activos: " + totalAdmins);
+            logger.info("✅ Token FCM registrado exitosamente para: {}", usuario.getNombre());
         } catch (Exception e) {
-            System.err.println("❌ Error al registrar token: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("❌ Error al registrar token: {}", e.getMessage());
         }
     }
 
@@ -292,7 +256,7 @@ public class NotificacionService {
         tokenDispositivoRepository.findByToken(token).ifPresent(td -> {
             td.setActivo(false);
             tokenDispositivoRepository.save(td);
-            System.out.println("✅ Token desactivado: " + token.substring(0, 20) + "...");
+            logger.info("✅ Token desactivado correctamente");
         });
     }
 
@@ -300,18 +264,12 @@ public class NotificacionService {
      * 📲 Envía notificación a TODOS los usuarios (ADMINs y USERs)
      */
     public void enviarNotificacionATodos(String titulo, String mensaje) {
-        System.out.println("📤 Enviando notificación a TODOS los usuarios...");
-        System.out.println("   Título: " + titulo);
-        System.out.println("   Mensaje: " + mensaje);
-
         List<TokenDispositivo> todosLosTokens = tokenDispositivoRepository.findByActivoTrue();
 
         if (todosLosTokens.isEmpty()) {
-            System.out.println("⚠️  No hay dispositivos registrados");
+            logger.debug("⚠️ No hay dispositivos registrados para enviar notificación a todos");
             return;
         }
-
-        System.out.println("📱 Encontrados " + todosLosTokens.size() + " dispositivo(s) registrados");
 
         List<String> tokenList = todosLosTokens.stream()
                 .map(TokenDispositivo::getToken)

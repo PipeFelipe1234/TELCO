@@ -22,6 +22,8 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
         @Query("SELECT r FROM Registro r WHERE r.usuario = :usuario AND r.horaSalida IS NULL ORDER BY r.fecha DESC, r.horaEntrada DESC")
         Optional<Registro> findUltimoRegistroSinSalida(@Param("usuario") Usuario usuario);
 
+        Optional<Registro> findTopByUsuarioOrderByFechaDescHoraEntradaDesc(Usuario usuario);
+
         List<Registro> findAllByUsuario(Usuario usuario);
 
         // 🔍 FILTROS PERSONALIZADOS PARA ADMIN

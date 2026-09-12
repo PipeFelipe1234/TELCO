@@ -13,6 +13,8 @@ import com.practica.backend.repository.RegistroReporteRepository;
 import com.practica.backend.repository.RegistroRepository;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -29,6 +31,8 @@ import java.util.Optional;
 
 @Service
 public class RegistroService {
+
+    private static final Logger logger = LoggerFactory.getLogger(RegistroService.class);
 
     private final RegistroRepository registroRepository;
     private final RegistroReporteRepository registroReporteRepository;
@@ -132,14 +136,23 @@ public class RegistroService {
             horaSalida = fechaHoraRegistro.toLocalTime();
         }
 
-        // 🔄 Buscar cualquier registro sin salida (sin importar la fecha de entrada)
-        Registro registro = registroRepository
-                .findUltimoRegistroSinSalida(usuario)
+        // 🔄 Buscar cualquier registro sin salida, o en su defecto por fecha/último
+        // registro
+        Optional<Registro> registroOpt = registroRepository.findUltimoRegistroSinSalida(usuario);
+        if (registroOpt.isEmpty() && fechaHoraRegistro != null) {
+            registroOpt = registroRepository.findByUsuarioAndFecha(usuario, fechaHoraRegistro.toLocalDate());
+        }
+        if (registroOpt.isEmpty()) {
+            registroOpt = registroRepository.findTopByUsuarioOrderByFechaDescHoraEntradaDesc(usuario);
+        }
+
+        Registro registro = registroOpt
                 .orElseThrow(() -> new RuntimeException("No hay entrada sin salida registrada"));
 
         // Validar precisión GPS
         if (request.precisionMetros() != null && request.precisionMetros() > 50) {
-            throw new RuntimeException("Precisión GPS insuficiente en salida");
+            logger.warn("⚠️ Salida de {} recibida con precisión GPS baja ({}m)", usuario.getNombre(),
+                    request.precisionMetros());
         }
 
         registro.setHoraSalida(horaSalida);
@@ -182,19 +195,36 @@ public class RegistroService {
     }
 
     public RegistroResponse agregarReporte(Usuario usuario, AgregarReporteRequest request) {
-        // Buscar el turno actual en curso
-        Registro registro = registroRepository
-                .findUltimoRegistroSinSalida(usuario)
-                .orElseThrow(() -> new RuntimeException("No hay entrada sin salida registrada"));
-
-        // Validar precisión GPS
-        if (request.precisionMetros() != null && request.precisionMetros() > 50) {
-            throw new RuntimeException("Precisión GPS insuficiente para registrar reporte");
-        }
-
         LocalDateTime fechaHoraReporte = parseISODateTime(request.fechaCreacion());
         if (fechaHoraReporte == null) {
             fechaHoraReporte = LocalDateTime.now(ZONA_COLOMBIA);
+        }
+
+        // Buscar el turno correspondiente:
+        // 1. Intentar buscar turno activo (sin salida)
+        Optional<Registro> registroOpt = registroRepository.findUltimoRegistroSinSalida(usuario);
+
+        // 2. Si el turno ya se cerró (marcó salida o se cerró automáticamente a las
+        // 23:55), buscar por fecha del reporte
+        if (registroOpt.isEmpty()) {
+            registroOpt = registroRepository.findByUsuarioAndFecha(usuario, fechaHoraReporte.toLocalDate());
+        }
+
+        // 3. Si tampoco existe para esa fecha exacta, vincular al último registro del
+        // usuario
+        if (registroOpt.isEmpty()) {
+            registroOpt = registroRepository.findTopByUsuarioOrderByFechaDescHoraEntradaDesc(usuario);
+        }
+
+        Registro registro = registroOpt
+                .orElseThrow(() -> new RuntimeException(
+                        "No hay registro de asistencia registrado para vincular este reporte"));
+
+        // Validar precisión GPS (loguear advertencia en lugar de fallar la
+        // sincronización offline)
+        if (request.precisionMetros() != null && request.precisionMetros() > 50) {
+            logger.warn("⚠️ Reporte de {} recibido con precisión GPS baja ({}m)", usuario.getNombre(),
+                    request.precisionMetros());
         }
 
         // Idempotencia exacta para sincronización offline: mismo usuario + mismo
