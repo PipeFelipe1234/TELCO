@@ -244,18 +244,21 @@ public class RegistroService {
         }
 
         String ubicacion = request.ubicacion();
-        if ((ubicacion == null || ubicacion.trim().isEmpty())
-                && request.latitud() != null
-                && request.longitud() != null) {
-            ubicacion = geocodingService.obtenerDireccion(request.latitud(), request.longitud());
-        }
+        // ⚠️ Para reportes NO llamar a Reverse Geocoding (los usuarios ingresarán la
+        // ubicación manualmente)
+        // if ((ubicacion == null || ubicacion.trim().isEmpty())
+        // && request.latitud() != null
+        // && request.longitud() != null) {
+        // ubicacion = geocodingService.obtenerDireccion(request.latitud(),
+        // request.longitud());
+        // }
 
         try {
             crearReporteTurno(
                     registro,
-                    request.latitud(),
-                    request.longitud(),
-                    request.precisionMetros(),
+                    null, // ⚠️ No guardar latitud en reportes
+                    null, // ⚠️ No guardar longitud en reportes
+                    null, // ⚠️ No guardar precisión en reportes
                     request.reporte(),
                     request.picture(),
                     ubicacion,
