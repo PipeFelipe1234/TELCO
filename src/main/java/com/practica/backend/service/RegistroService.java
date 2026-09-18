@@ -95,6 +95,16 @@ public class RegistroService {
             horaActual = fechaHoraRegistro.toLocalTime();
         }
 
+        // 🔒 IDEMPOTENCIA: Prevenir doble entrada por reintento/timeout del frontend
+        // Si ya existe entrada para este usuario hoy SIN salida, devolver esa
+        Optional<Registro> registroExistente = registroRepository.findByUsuarioAndFechaAndHoraSalidaIsNull(usuario,
+                hoy);
+        if (registroExistente.isPresent()) {
+            logger.warn("⚠️ Reintento detectado: {} ya tiene entrada a las {} el {}. Devolviendo registro existente.",
+                    usuario.getNombre(), registroExistente.get().getHoraEntrada(), hoy);
+            return mapToResponse(registroExistente.get());
+        }
+
         Registro registro = new Registro();
         registro.setUsuario(usuario);
         registro.setFecha(hoy);
