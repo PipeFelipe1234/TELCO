@@ -29,7 +29,13 @@ public class AuthService {
                 usuario.getFoto(),
                 usuario.getCargo());
 
-        return new LoginResponse(token);
+        return new LoginResponse(
+                token,
+                usuario.getIdentificacion(),
+                usuario.getNombre(),
+                usuario.getRol(),
+                usuario.getFoto(),
+                usuario.getCargo());
     }
 
     public LoginResponse refrescarToken(String authHeader) {
@@ -50,12 +56,12 @@ public class AuthService {
 
         // Verificar si el token es válido (no está expirado)
         if (JwtUtil.esTokenValido(token)) {
-            // Token aún válido: devolver el mismo token
-            return new LoginResponse(token);
+            // Token aún válido: devolver el mismo token con los datos
+            return new LoginResponse(token, identificacion, nombre, rol, foto, cargo);
         } else {
             // Token expirado: generar uno nuevo
             String nuevoToken = JwtUtil.generarToken(identificacion, rol, nombre, foto, cargo);
-            return new LoginResponse(nuevoToken);
+            return new LoginResponse(nuevoToken, identificacion, nombre, rol, foto, cargo);
         }
     }
 }
