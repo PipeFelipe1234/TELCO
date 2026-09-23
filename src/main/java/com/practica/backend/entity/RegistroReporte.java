@@ -39,6 +39,13 @@ public class RegistroReporte {
     @Column(name = "novedad_id")
     private Long novedadId;
 
+    // 👤 INFORMACIÓN DEL CLIENTE VISITADO
+    private String cliente; // Nombre completo del usuario visitado
+    private String ccCliente; // CC/Cédula del usuario visitado
+
+    // 📊 ESTADO DE VISITA (solo para cobradores)
+    private String estadoVisita; // PAGO_COMPLETO, PAGO_PARCIAL, NO_PAGO, PROMETE_PAGAR_DESPUÉS, etc.
+
     public Long getId() {
         return id;
     }
@@ -125,5 +132,29 @@ public class RegistroReporte {
 
     public void setNovedadId(Long novedadId) {
         this.novedadId = novedadId;
+    }
+
+    public String getCliente() {
+        return cliente;
+    }
+
+    public void setCliente(String cliente) {
+        this.cliente = cliente;
+    }
+
+    public String getCcCliente() {
+        return ccCliente;
+    }
+
+    public void setCcCliente(String ccCliente) {
+        this.ccCliente = ccCliente;
+    }
+
+    public String getEstadoVisita() {
+        return estadoVisita;
+    }
+
+    public void setEstadoVisita(String estadoVisita) {
+        this.estadoVisita = estadoVisita;
     }
 }

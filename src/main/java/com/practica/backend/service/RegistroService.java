@@ -210,6 +210,29 @@ public class RegistroService {
             fechaHoraReporte = LocalDateTime.now(ZONA_COLOMBIA);
         }
 
+        // 🔒 VALIDACIONES DE CAMPOS OBLIGATORIOS
+        // Cliente y CC son obligatorios para TODOS (COBRADOR y TÉCNICO)
+        if (request.cliente() == null || request.cliente().trim().isEmpty()) {
+            throw new RuntimeException("El nombre del cliente es obligatorio");
+        }
+        if (request.ccCliente() == null || request.ccCliente().trim().isEmpty()) {
+            throw new RuntimeException("La CC/Cédula del cliente es obligatoria");
+        }
+
+        // Ubicación/Dirección es OBLIGATORIA para TODOS (COBRADOR y TÉCNICO)
+        if (request.ubicacion() == null || request.ubicacion().trim().isEmpty()) {
+            throw new RuntimeException("La dirección o ubicación es obligatoria");
+        }
+
+        // estadoVisita es OBLIGATORIO solo para COBRADOR (USER_COO)
+        if ("USER_COO".equals(usuario.getRol())) {
+            if (request.estadoVisita() == null || request.estadoVisita().trim().isEmpty()) {
+                throw new RuntimeException("El estado de visita es obligatorio para cobradores");
+            }
+            // Validar que sea un estado válido
+            validarEstadoVisita(request.estadoVisita());
+        }
+
         // Buscar el turno correspondiente:
         // 1. Intentar buscar turno activo (sin salida)
         Optional<Registro> registroOpt = registroRepository.findUltimoRegistroSinSalida(usuario);
@@ -253,16 +276,6 @@ public class RegistroService {
             return mapToResponse(registro);
         }
 
-        String ubicacion = request.ubicacion();
-        // ⚠️ Para reportes NO llamar a Reverse Geocoding (los usuarios ingresarán la
-        // ubicación manualmente)
-        // if ((ubicacion == null || ubicacion.trim().isEmpty())
-        // && request.latitud() != null
-        // && request.longitud() != null) {
-        // ubicacion = geocodingService.obtenerDireccion(request.latitud(),
-        // request.longitud());
-        // }
-
         try {
             crearReporteTurno(
                     registro,
@@ -271,10 +284,13 @@ public class RegistroService {
                     null, // ⚠️ No guardar precisión en reportes
                     request.reporte(),
                     request.picture(),
-                    ubicacion,
+                    request.ubicacion(),
                     fechaHoraReporte,
                     false,
-                    request.novedadId());
+                    request.novedadId(),
+                    request.cliente(),
+                    request.ccCliente(),
+                    request.estadoVisita());
         } catch (DataIntegrityViolationException ex) {
             // Segunda barrera (BD): en carrera concurrente, no duplicar reporte.
             return mapToResponse(registro);
@@ -291,6 +307,34 @@ public class RegistroService {
         return mapToResponse(guardado);
     }
 
+    // ✅ VALIDAR ESTADO DE VISITA PARA COBRADORES
+    private void validarEstadoVisita(String estadoVisita) {
+        String[] estadosValidos = {
+                "PAGO_COMPLETO",
+                "PAGO_PARCIAL",
+                "NO_PAGO",
+                "PROMETE_PAGAR_DESPUÉS",
+                "PROMETE_PAGAR_CUANDO_REPAREN",
+                "USUARIO_NO_ESTA",
+                "NO_CONTESTA_LLAMADA",
+                "USUARIO_ENOJADO",
+                "AMENAZA_RETIRARSE"
+        };
+
+        boolean esValido = false;
+        for (String estado : estadosValidos) {
+            if (estado.equals(estadoVisita)) {
+                esValido = true;
+                break;
+            }
+        }
+
+        if (!esValido) {
+            throw new RuntimeException("Estado de visita inválido: " + estadoVisita +
+                    ". Estados válidos: " + String.join(", ", estadosValidos));
+        }
+    }
+
     private boolean esReporteDuplicado(
             RegistroReporte ultimoReporte,
             AgregarReporteRequest request,
@@ -301,6 +345,18 @@ public class RegistroService {
 
         long diferenciaMinutos = Math.abs(Duration.between(ultimoReporte.getFechaHora(), fechaHoraReporte).toMinutes());
         if (diferenciaMinutos > VENTANA_DUPLICADO_MINUTOS) {
+            return false;
+        }
+
+        // Verificar que cliente y ccCliente sean iguales
+        if (!Objects.equals(ultimoReporte.getCliente(), request.cliente())) {
+            return false;
+        }
+        if (!Objects.equals(ultimoReporte.getCcCliente(), request.ccCliente())) {
+            return false;
+        }
+        // Verificar que estadoVisita sea igual (relevante para cobradores)
+        if (!Objects.equals(ultimoReporte.getEstadoVisita(), request.estadoVisita())) {
             return false;
         }
 
@@ -504,7 +560,10 @@ public class RegistroService {
             String ubicacion,
             LocalDateTime fechaHora,
             boolean esSalida,
-            Long novedadId) {
+            Long novedadId,
+            String cliente,
+            String ccCliente,
+            String estadoVisita) {
         RegistroReporte reporteTurno = new RegistroReporte();
         reporteTurno.setRegistro(registro);
         reporteTurno.setLatitud(latitud);
@@ -516,6 +575,9 @@ public class RegistroService {
         reporteTurno.setFechaHora(fechaHora);
         reporteTurno.setEsSalida(esSalida);
         reporteTurno.setNovedadId(novedadId);
+        reporteTurno.setCliente(cliente);
+        reporteTurno.setCcCliente(ccCliente);
+        reporteTurno.setEstadoVisita(estadoVisita);
         registroReporteRepository.save(reporteTurno);
     }
 
@@ -530,7 +592,10 @@ public class RegistroService {
                 reporte.getPicture(),
                 reporte.getUbicacion(),
                 reporte.getEsSalida(),
-                reporte.getNovedadId());
+                reporte.getNovedadId(),
+                reporte.getCliente(),
+                reporte.getCcCliente(),
+                reporte.getEstadoVisita());
     }
 
     // 📲 NOTIFICACIÓN DE ENTRADA
