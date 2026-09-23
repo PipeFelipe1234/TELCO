@@ -210,26 +210,14 @@ public class RegistroService {
             fechaHoraReporte = LocalDateTime.now(ZONA_COLOMBIA);
         }
 
-        // 🔒 VALIDACIONES DE CAMPOS OBLIGATORIOS
-        // Cliente y CC son obligatorios para TODOS (COBRADOR y TÉCNICO)
-        if (request.cliente() == null || request.cliente().trim().isEmpty()) {
-            throw new RuntimeException("El nombre del cliente es obligatorio");
-        }
-        if (request.ccCliente() == null || request.ccCliente().trim().isEmpty()) {
-            throw new RuntimeException("La CC/Cédula del cliente es obligatoria");
-        }
+        // ⚠️ VALIDACIONES OPCIONALES (retrocompatibilidad con APK antigua)
+        // Los campos cliente, ccCliente, ubicacion y estadoVisita son OPCIONALES por
+        // ahora
+        // Se guardarán como null si no se envían (APK antigua)
+        // Cuando se envíen (APK nueva), se guardan normalmente
 
-        // Ubicación/Dirección es OBLIGATORIA para TODOS (COBRADOR y TÉCNICO)
-        if (request.ubicacion() == null || request.ubicacion().trim().isEmpty()) {
-            throw new RuntimeException("La dirección o ubicación es obligatoria");
-        }
-
-        // estadoVisita es OBLIGATORIO solo para COBRADOR (USER_COO)
-        if ("USER_COO".equals(usuario.getRol())) {
-            if (request.estadoVisita() == null || request.estadoVisita().trim().isEmpty()) {
-                throw new RuntimeException("El estado de visita es obligatorio para cobradores");
-            }
-            // Validar que sea un estado válido
+        // Si estadoVisita se envía, validar que sea un estado válido
+        if (request.estadoVisita() != null && !request.estadoVisita().trim().isEmpty()) {
             validarEstadoVisita(request.estadoVisita());
         }
 
