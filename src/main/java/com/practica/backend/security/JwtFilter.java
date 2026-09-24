@@ -32,7 +32,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
         // Log útil para sincronización offline y endpoints sensibles (nivel DEBUG para
         // evitar flood de logs)
-        if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")) {
+        if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")
+                || requestURI.startsWith("/api/reportes")) {
             logger.debug("🔐 [JwtFilter] {} {} authHeaderPresent={}", method, requestURI, authHeader != null);
         }
 
@@ -56,7 +57,8 @@ public class JwtFilter extends OncePerRequestFilter {
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                    if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")) {
+                    if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")
+                            || requestURI.startsWith("/api/reportes")) {
                         logger.info("✅ [JwtFilter] Usuario autenticado: {} rol={} endpoint={}", identificacion, rol,
                                 requestURI);
                     }
@@ -70,7 +72,8 @@ public class JwtFilter extends OncePerRequestFilter {
             } catch (Exception e) {
                 logger.error("⛔ [JwtFilter] Error en validación JWT para {}: {}", requestURI, e.getMessage());
             }
-        } else if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")) {
+        } else if (requestURI.startsWith("/api/registros") || requestURI.startsWith("/api/ubicacion")
+                || requestURI.startsWith("/api/reportes")) {
             logger.warn("⚠️ [JwtFilter] Sin header Authorization para: {}", requestURI);
         }
 
