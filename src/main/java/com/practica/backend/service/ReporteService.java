@@ -33,7 +33,9 @@ public class ReporteService {
             String ccCliente,
             String nombreCliente,
             String rolUsuario,
-            String identificacionUsuario,
+            // ⏳ COMENTADO: Filtro por identificación de usuario pendiente de implementación
+            // en frontend
+            // String identificacionUsuario,
             String estadoVisita,
             Long novedadId,
             LocalDate fechaDesde,
@@ -42,8 +44,8 @@ public class ReporteService {
             int size) {
 
         logger.info(
-                "📊 Buscando reportes con filtros: ccCliente={}, nombreCliente={}, tipoUsuario={}, identificacionUsuario={}, estadoVisita={}, novedadId={}, fechaDesde={}, fechaHasta={}, page={}, size={}",
-                ccCliente, nombreCliente, rolUsuario, identificacionUsuario, estadoVisita, novedadId, fechaDesde,
+                "📊 Buscando reportes con filtros: ccCliente={}, nombreCliente={}, tipoUsuario={}, estadoVisita={}, novedadId={}, fechaDesde={}, fechaHasta={}, page={}, size={}",
+                ccCliente, nombreCliente, rolUsuario, estadoVisita, novedadId, fechaDesde,
                 fechaHasta, page, size);
 
         // Construir Specification dinámico
@@ -70,12 +72,14 @@ public class ReporteService {
                     rolUsuario));
         }
 
-        // Filtro 3.5: Identificación Usuario (cédula del cobrador/técnico)
-        if (identificacionUsuario != null && !identificacionUsuario.trim().isEmpty()) {
-            spec = spec.and((root, query, cb) -> cb.like(
-                    cb.lower(root.get("registro").get("usuario").get("identificacion")),
-                    "%" + identificacionUsuario.toLowerCase() + "%"));
-        }
+        // ⏳ COMENTADO: Filtro 3.5 - Identificación Usuario (pendiente de implementación
+        // en frontend)
+        // if (identificacionUsuario != null && !identificacionUsuario.trim().isEmpty())
+        // {
+        // spec = spec.and((root, query, cb) -> cb.like(
+        // cb.lower(root.get("registro").get("usuario").get("identificacion")),
+        // "%" + identificacionUsuario.toLowerCase() + "%"));
+        // }
 
         // Filtro 4: Estado Visita (solo para cobradores)
         if (estadoVisita != null && !estadoVisita.trim().isEmpty()) {
