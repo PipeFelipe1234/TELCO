@@ -56,16 +56,24 @@ public class AdminController {
         this.geoExportService = geoExportService;
     }
 
-    // 👮 VER TODOS LOS REGISTROS
+    // 👮 VER TODOS LOS REGISTROS CON PAGINACIÓN
+    // Ordenados por "En Turno" primero, luego por fecha descendente
     @GetMapping("/registros")
-    public ResponseEntity<?> todosLosRegistros() {
+    public ResponseEntity<?> todosLosRegistros(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
         Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
 
-        logger.info("👮 Admin con cargo {} y ciudades {} consultando registros",
-                admin != null ? admin.getCargo() : null,
-                admin != null ? admin.getCiudades() : null);
-        return ResponseEntity.ok(registroService.obtenerTodosFiltrados(admin));
+        logger.info("👮 Admin con cargo {} consultando registros paginados (page={}, size={})",
+                admin != null ? admin.getCargo() : null, page, size);
+
+        // Validar tamaño máximo
+        if (size > 100) {
+            size = 100;
+        }
+
+        return ResponseEntity.ok(registroService.obtenerRegistrosPaginados(admin, page, size));
     }
 
     // 👮 VER TODOS LOS USUARIOS
