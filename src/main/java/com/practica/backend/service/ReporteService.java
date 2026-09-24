@@ -92,19 +92,23 @@ public class ReporteService {
             finDia = LocalDateTime.of(fechaHasta, LocalTime.MAX);
         }
 
-        if (inicioDia != null && finDia != null) {
+        // Variables finales para usar en lambdas
+        final LocalDateTime finalInicioDia = inicioDia;
+        final LocalDateTime finalFinDia = finDia;
+
+        if (finalInicioDia != null && finalFinDia != null) {
             spec = spec.and((root, query, cb) -> cb.between(
                     root.get("fechaHora"),
-                    inicioDia,
-                    finDia));
-        } else if (inicioDia != null) {
+                    finalInicioDia,
+                    finalFinDia));
+        } else if (finalInicioDia != null) {
             spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(
                     root.get("fechaHora"),
-                    inicioDia));
-        } else if (finDia != null) {
+                    finalInicioDia));
+        } else if (finalFinDia != null) {
             spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(
                     root.get("fechaHora"),
-                    finDia));
+                    finalFinDia));
         }
 
         // Paginación y ordenamiento
