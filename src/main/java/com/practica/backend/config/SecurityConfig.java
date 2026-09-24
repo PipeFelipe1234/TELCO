@@ -45,6 +45,9 @@ public class SecurityConfig {
                         // ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
+                        // REPORTES - Lectura para usuarios autenticados
+                        .requestMatchers(HttpMethod.GET, "/api/reportes").authenticated()
+
                         .anyRequest().authenticated())
 
                 // Filtro JWT antes del login de Spring Security
