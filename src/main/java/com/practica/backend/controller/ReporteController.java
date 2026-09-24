@@ -25,17 +25,18 @@ public class ReporteController {
     /**
      * Obtiene todos los reportes con filtros y paginación
      * 
-     * @param ccCliente     Filtro por CC del cliente visitado
-     * @param nombreCliente Filtro por nombre del cliente visitado
-     * @param tipoUsuario   Filtro por tipo de usuario (USER_TEC, USER_COO)
-     * @param estadoVisita  Filtro por estado de visita (PAGO_COMPLETO,
-     *                      NO_PAGO,
-     *                      etc.)
-     * @param novedadId     Filtro por ID de novedad
-     * @param fechaDesde    Fecha inicio del rango (formato: yyyy-MM-dd)
-     * @param fechaHasta    Fecha fin del rango (formato: yyyy-MM-dd)
-     * @param page          Número de página (0-indexed)
-     * @param size          Cantidad de registros por página (máximo 100)
+     * @param ccCliente             Filtro por CC del cliente visitado
+     * @param nombreCliente         Filtro por nombre del cliente visitado
+     * @param tipoUsuario           Filtro por tipo de usuario (USER_TEC, USER_COO)
+     * @param identificacionUsuario Filtro por identificación del usuario (cédula)
+     * @param estadoVisita          Filtro por estado de visita (PAGO_COMPLETO,
+     *                              NO_PAGO,
+     *                              etc.)
+     * @param novedadId             Filtro por ID de novedad
+     * @param fechaDesde            Fecha inicio del rango (formato: yyyy-MM-dd)
+     * @param fechaHasta            Fecha fin del rango (formato: yyyy-MM-dd)
+     * @param page                  Número de página (0-indexed)
+     * @param size                  Cantidad de registros por página (máximo 100)
      * @return Página de reportes
      */
     @GetMapping
@@ -43,6 +44,7 @@ public class ReporteController {
             @RequestParam(required = false) String ccCliente,
             @RequestParam(required = false) String nombreCliente,
             @RequestParam(required = false) String tipoUsuario,
+            @RequestParam(required = false) String identificacionUsuario,
             @RequestParam(required = false) String estadoVisita,
             @RequestParam(required = false) Long novedadId,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate fechaDesde,
@@ -51,8 +53,8 @@ public class ReporteController {
             @RequestParam(defaultValue = "20") int size) {
 
         logger.info(
-                "📊 GET /api/reportes - Filtros: ccCliente={}, nombreCliente={}, tipoUsuario={}, estadoVisita={}, novedadId={}, fechaDesde={}, fechaHasta={}, page={}, size={}",
-                ccCliente, nombreCliente, tipoUsuario, estadoVisita, novedadId, fechaDesde,
+                "📊 GET /api/reportes - Filtros: ccCliente={}, nombreCliente={}, tipoUsuario={}, identificacionUsuario={}, estadoVisita={}, novedadId={}, fechaDesde={}, fechaHasta={}, page={}, size={}",
+                ccCliente, nombreCliente, tipoUsuario, identificacionUsuario, estadoVisita, novedadId, fechaDesde,
                 fechaHasta, page, size);
 
         // Validar tamaño máximo
@@ -64,6 +66,7 @@ public class ReporteController {
                 ccCliente,
                 nombreCliente,
                 tipoUsuario,
+                identificacionUsuario,
                 estadoVisita,
                 novedadId,
                 fechaDesde,
