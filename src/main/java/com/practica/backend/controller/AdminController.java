@@ -56,8 +56,9 @@ public class AdminController {
         this.geoExportService = geoExportService;
     }
 
-    // 👮 VER TODOS LOS REGISTROS CON PAGINACIÓN
-    // Ordenados por "En Turno" primero, luego por fecha descendente
+    // 👮 VER TODOS LOS REGISTROS - SIN PAGINACIÓN (por ahora, en espera de
+    // implementación frontend)
+    // ⏳ PAGINACIÓN COMENTADA - Descomentar cuando Brian implemente en el frontend
     @GetMapping("/registros")
     public ResponseEntity<?> todosLosRegistros(
             @RequestParam(defaultValue = "0") int page,
@@ -65,15 +66,14 @@ public class AdminController {
         String identificacion = SecurityContextHolder.getContext().getAuthentication().getName();
         Usuario admin = usuarioService.obtenerPorIdentificacion(identificacion);
 
-        logger.info("👮 Admin con cargo {} consultando registros paginados (page={}, size={})",
-                admin != null ? admin.getCargo() : null, page, size);
+        logger.info("👮 Admin consultando registros");
 
-        // Validar tamaño máximo
-        if (size > 100) {
-            size = 100;
-        }
+        // ⏳ DESCOMENTAR ESTA LÍNEA CUANDO BRIAN IMPLEMENTE PAGINACIÓN EN FRONTEND:
+        // return ResponseEntity.ok(registroService.obtenerRegistrosPaginados(admin,
+        // page, size));
 
-        return ResponseEntity.ok(registroService.obtenerRegistrosPaginados(admin, page, size));
+        // ✅ VERSIÓN SIN PAGINACIÓN (temporal, hasta que frontend esté listo):
+        return ResponseEntity.ok(registroService.obtenerTodosFiltrados(admin));
     }
 
     // 👮 VER TODOS LOS USUARIOS

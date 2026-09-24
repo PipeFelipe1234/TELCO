@@ -435,44 +435,54 @@ public class RegistroService {
     }
 
     /**
+     * ⏳ PENDIENTE DE IMPLEMENTACIÓN EN FRONTEND
      * Obtiene registros paginados y ordenados por estado "En Turno" primero
      * - Registros "En Turno" (horaSalida = null) aparecen primero
      * - Luego los que ya salieron, ordenados por fecha DESC
+     * 
+     * DESCOMENTAR CUANDO BRIAN IMPLEMENTE PAGINACIÓN EN EL FRONTEND
      */
-    public Page<RegistroResponse> obtenerRegistrosPaginados(Usuario admin, int page, int size) {
-        String cargoAdmin = admin != null ? admin.getCargo() : null;
-        List<Registro> todosRegistros = registroRepository.findAll();
-
-        // Filtrar por visibilidad del admin
-        List<Registro> registrosFiltrados = todosRegistros.stream()
-                .filter(r -> empleadoVisibleParaAdmin(r, cargoAdmin, admin != null ? admin.getCiudades() : List.of()))
-                .toList();
-
-        // Ordenar: primero "En Turno" (horaSalida = null), luego por fecha DESC
-        List<Registro> registrosOrdenados = registrosFiltrados.stream()
-                .sorted((r1, r2) -> {
-                    // Si ambos están en turno o ambos no, ordenar por fecha DESC
-                    boolean r1EnTurno = r1.getHoraSalida() == null;
-                    boolean r2EnTurno = r2.getHoraSalida() == null;
-
-                    if (r1EnTurno && !r2EnTurno)
-                        return -1; // r1 primero (está en turno)
-                    if (!r1EnTurno && r2EnTurno)
-                        return 1; // r2 primero (está en turno)
-
-                    // Si tienen el mismo estado, ordenar por fecha DESC
-                    return r2.getFecha().compareTo(r1.getFecha());
-                })
-                .toList();
-
-        // Aplicar paginación
-        int start = page * size;
-        int end = Math.min(start + size, registrosOrdenados.size());
-        List<RegistroResponse> content = registrosOrdenados.subList(start, end).stream()
-                .map(this::mapToResponse)
-                .toList();
-
-        return new PageImpl<>(content, PageRequest.of(page, size), registrosOrdenados.size());
+    /*
+     * public Page<RegistroResponse> obtenerRegistrosPaginados(Usuario admin, int
+     * page, int size) {
+     * String cargoAdmin = admin != null ? admin.getCargo() : null;
+     * List<Registro> todosRegistros = registroRepository.findAll();
+     * 
+     * // Filtrar por visibilidad del admin
+     * List<Registro> registrosFiltrados = todosRegistros.stream()
+     * .filter(r -> empleadoVisibleParaAdmin(r, cargoAdmin, admin != null ?
+     * admin.getCiudades() : List.of()))
+     * .toList();
+     * 
+     * // Ordenar: primero "En Turno" (horaSalida = null), luego por fecha DESC
+     * List<Registro> registrosOrdenados = registrosFiltrados.stream()
+     * .sorted((r1, r2) -> {
+     * // Si ambos están en turno o ambos no, ordenar por fecha DESC
+     * boolean r1EnTurno = r1.getHoraSalida() == null;
+     * boolean r2EnTurno = r2.getHoraSalida() == null;
+     * 
+     * if (r1EnTurno && !r2EnTurno)
+     * return -1; // r1 primero (está en turno)
+     * if (!r1EnTurno && r2EnTurno)
+     * return 1; // r2 primero (está en turno)
+     * 
+     * // Si tienen el mismo estado, ordenar por fecha DESC
+     * return r2.getFecha().compareTo(r1.getFecha());
+     * })
+     * .toList();
+     * 
+     * // Aplicar paginación
+     * int start = page * size;
+     * int end = Math.min(start + size, registrosOrdenados.size());
+     * List<RegistroResponse> content = registrosOrdenados.subList(start,
+     * end).stream()
+     * .map(this::mapToResponse)
+     * .toList();
+     * 
+     * return new PageImpl<>(content, PageRequest.of(page, size),
+     * registrosOrdenados.size());
+     * }
+     */
     }
 
     /**
