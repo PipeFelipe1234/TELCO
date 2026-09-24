@@ -3,6 +3,7 @@ package com.practica.backend.repository;
 import com.practica.backend.entity.Registro;
 import com.practica.backend.entity.RegistroReporte;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,7 +13,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface RegistroReporteRepository extends JpaRepository<RegistroReporte, Long> {
+public interface RegistroReporteRepository
+                extends JpaRepository<RegistroReporte, Long>, JpaSpecificationExecutor<RegistroReporte> {
 
         List<RegistroReporte> findByRegistroOrderByFechaHoraAsc(Registro registro);
 
