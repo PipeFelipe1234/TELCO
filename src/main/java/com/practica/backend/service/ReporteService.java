@@ -33,9 +33,6 @@ public class ReporteService {
             String ccCliente,
             String nombreCliente,
             String rolUsuario,
-            // ⏳ COMENTADO: Filtro por identificación de usuario pendiente de implementación
-            // en frontend
-            // String identificacionUsuario,
             String estadoVisita,
             Long novedadId,
             LocalDate fechaDesde,

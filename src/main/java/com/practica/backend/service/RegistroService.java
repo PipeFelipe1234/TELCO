@@ -457,16 +457,12 @@ public class RegistroService {
      * // Ordenar: primero "En Turno" (horaSalida = null), luego por fecha DESC
      * List<Registro> registrosOrdenados = registrosFiltrados.stream()
      * .sorted((r1, r2) -> {
-     * // Si ambos están en turno o ambos no, ordenar por fecha DESC
      * boolean r1EnTurno = r1.getHoraSalida() == null;
      * boolean r2EnTurno = r2.getHoraSalida() == null;
      * 
-     * if (r1EnTurno && !r2EnTurno)
-     * return -1; // r1 primero (está en turno)
-     * if (!r1EnTurno && r2EnTurno)
-     * return 1; // r2 primero (está en turno)
+     * if (r1EnTurno && !r2EnTurno) return -1;
+     * if (!r1EnTurno && r2EnTurno) return 1;
      * 
-     * // Si tienen el mismo estado, ordenar por fecha DESC
      * return r2.getFecha().compareTo(r1.getFecha());
      * })
      * .toList();
@@ -483,7 +479,6 @@ public class RegistroService {
      * registrosOrdenados.size());
      * }
      */
-    }
 
     /**
      * Filtrar registros con criterios y filtrado por cargo+ciudades del admin.
