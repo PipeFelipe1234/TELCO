@@ -435,6 +435,19 @@ public class RegistroService {
     }
 
     /**
+     * Obtiene un registro específico por ID con todos sus reportes
+     * Usado cuando se hace click en un registro en la interfaz de admin
+     */
+    public RegistroResponse obtenerRegistroPorId(Long registroId) {
+        Registro registro = registroRepository.findById(registroId)
+                .orElseThrow(() -> new RuntimeException("Registro no encontrado con ID: " + registroId));
+
+        logger.info("📋 Obteniendo registro ID={} usuario={}", registroId, registro.getUsuario().getNombre());
+
+        return mapToResponse(registro);
+    }
+
+    /**
      * ⏳ PENDIENTE DE IMPLEMENTACIÓN EN FRONTEND
      * Obtiene registros paginados y ordenados por estado "En Turno" primero
      * - Registros "En Turno" (horaSalida = null) aparecen primero
