@@ -48,9 +48,6 @@ public class SecurityConfig {
                         // REPORTES - Lectura para usuarios autenticados
                         .requestMatchers(HttpMethod.GET, "/api/reportes").authenticated()
 
-                        // REGISTROS - Lectura de registros específicos para usuarios autenticados
-                        .requestMatchers(HttpMethod.GET, "/api/registros/**").authenticated()
-
                         .anyRequest().authenticated())
 
                 // Filtro JWT antes del login de Spring Security

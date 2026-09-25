@@ -115,21 +115,6 @@ public class RegistroController {
                                 registroService.obtenerMisRegistros(usuario));
         }
 
-        /**
-         * Obtiene un registro específico por ID con todos sus reportes
-         * Usado cuando se hace click en un registro para ver sus detalles
-         * 
-         * @param registroId ID del registro a obtener
-         * @return Objeto RegistroResponse con todos los reportes asociados
-         */
-        @GetMapping("/{registroId}")
-        public ResponseEntity<?> obtenerRegistroPorId(@PathVariable Long registroId) {
-                logger.info("📋 GET /api/registros/{} - Obteniendo registro específico", registroId);
-                return ResponseEntity.ok(registroService.obtenerRegistroPorId(registroId));
-        }
-
-        }
-
         // ============================
         // 📤 EXPORTACIÓN DE REGISTROS (USER)
         // ============================
