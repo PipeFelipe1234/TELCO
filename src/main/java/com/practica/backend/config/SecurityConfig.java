@@ -45,6 +45,9 @@ public class SecurityConfig {
                         // ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
 
+                        // ASISTENCIA - Solo para admins
+                        .requestMatchers(HttpMethod.GET, "/api/asistencia").hasRole("ADMIN")
+
                         // REPORTES - Lectura para usuarios autenticados
                         .requestMatchers(HttpMethod.GET, "/api/reportes").authenticated()
 

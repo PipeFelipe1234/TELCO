@@ -110,4 +110,8 @@ public interface RegistroRepository extends JpaRepository<Registro, Long> {
 
         // ⏰ OBTENER REGISTROS ABIERTOS DE UN DÍA ESPECÍFICO
         List<Registro> findByFechaAndHoraSalidaIsNull(LocalDate fecha);
+
+        // 📅 OBTENER TODOS LOS REGISTROS DE UN DÍA (para asistencia)
+        @Query("SELECT r FROM Registro r WHERE r.fecha = :fecha ORDER BY r.usuario.nombre ASC")
+        List<Registro> findByFecha(@Param("fecha") LocalDate fecha);
 }

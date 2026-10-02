@@ -39,6 +39,10 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Query("SELECT u FROM Usuario u WHERE u.rol = 'ADMIN' AND u.cargo = 'ADMIN_TEC'")
     List<Usuario> findAllAdminsTecnicos();
 
+    // 📍 Buscar usuarios por cargo y rol (para asistencia)
+    @Query("SELECT u FROM Usuario u WHERE u.cargo = :cargo AND u.rol = :rol")
+    List<Usuario> findByCargoAndRol(@Param("cargo") String cargo, @Param("rol") String rol);
+
     // 📍 Buscar ADMINs Coobradores (rol ADMIN y cargo ADMIN_COO)
     @Query("SELECT u FROM Usuario u WHERE u.rol = 'ADMIN' AND u.cargo = 'ADMIN_COO'")
     List<Usuario> findAllAdminsCoobradores();

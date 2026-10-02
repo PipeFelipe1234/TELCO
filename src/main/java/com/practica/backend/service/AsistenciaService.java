@@ -1,0 +1,175 @@
+package com.practica.backend.service;
+
+import com.practica.backend.dto.AsistenciaResponse;
+import com.practica.backend.dto.DetallesAsistenciaResponse;
+import com.practica.backend.dto.PersonalEnTurno;
+import com.practica.backend.dto.PersonalFinalizado;
+import com.practica.backend.dto.PersonalNoIniciado;
+import com.practica.backend.dto.ResumenAsistenciaResponse;
+import com.practica.backend.entity.Registro;
+import com.practica.backend.entity.Usuario;
+import com.practica.backend.repository.RegistroRepository;
+import com.practica.backend.repository.UsuarioRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+public class AsistenciaService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AsistenciaService.class);
+    private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
+
+    private final UsuarioRepository usuarioRepository;
+    private final RegistroRepository registroRepository;
+
+    public AsistenciaService(UsuarioRepository usuarioRepository, RegistroRepository registroRepository) {
+        this.usuarioRepository = usuarioRepository;
+        this.registroRepository = registroRepository;
+    }
+
+    /**
+     * Obtiene el resumen de asistencia del día actual
+     * Filtra por rol del admin y sus ciudades asignadas
+     */
+    public AsistenciaResponse obtenerAsistenciaHoy(Usuario admin, String tipoUsuario) {
+        LocalDate hoy = LocalDate.now(ZONA_COLOMBIA);
+        logger.info("📊 Obteniendo asistencia para el día {} - Admin: {} ({})", hoy, admin.getNombre(),
+                admin.getCargo());
+
+        // Obtener personal a monitorear según rol del admin
+        List<Usuario> personalAMonitorear = obtenerPersonalParaAdmin(admin, tipoUsuario);
+        logger.debug("📋 Personal a monitorear: {} usuarios", personalAMonitorear.size());
+
+        // Obtener registros del día actual
+        List<Registro> registrosHoy = registroRepository.findByFecha(hoy);
+        Map<Long, Registro> registrosPorUsuario = registrosHoy.stream()
+                .collect(Collectors.toMap(r -> r.getUsuario().getId(), r -> r));
+
+        // Clasificar personal en tres categorías
+        List<PersonalNoIniciado> noIniciados = new ArrayList<>();
+        List<PersonalEnTurno> enTurno = new ArrayList<>();
+        List<PersonalFinalizado> finalizados = new ArrayList<>();
+
+        for (Usuario usuario : personalAMonitorear) {
+            Registro registro = registrosPorUsuario.get(usuario.getId());
+
+            if (registro == null) {
+                // No ha iniciado turno
+                noIniciados.add(new PersonalNoIniciado(
+                        null,
+                        usuario.getIdentificacion(),
+                        usuario.getNombre(),
+                        usuario.getCargo(),
+                        extraerPrimeraCiudad(usuario.getCiudades())));
+            } else if (registro.getHoraSalida() == null) {
+                // En turno
+                enTurno.add(new PersonalEnTurno(
+                        registro.getId(),
+                        usuario.getIdentificacion(),
+                        usuario.getNombre(),
+                        usuario.getCargo(),
+                        registro.getHoraEntrada().toString(),
+                        extraerPrimeraCiudad(usuario.getCiudades())));
+            } else {
+                // Turno finalizado
+                finalizados.add(new PersonalFinalizado(
+                        registro.getId(),
+                        usuario.getIdentificacion(),
+                        usuario.getNombre(),
+                        usuario.getCargo(),
+                        registro.getHoraEntrada().toString(),
+                        registro.getHoraSalida().toString(),
+                        extraerPrimeraCiudad(usuario.getCiudades())));
+            }
+        }
+
+        // Crear resumen
+        int total = noIniciados.size() + enTurno.size() + finalizados.size();
+        ResumenAsistenciaResponse resumen = new ResumenAsistenciaResponse(
+                total,
+                noIniciados.size(),
+                enTurno.size(),
+                finalizados.size());
+
+        // Crear detalles
+        DetallesAsistenciaResponse detalles = new DetallesAsistenciaResponse(
+                noIniciados,
+                enTurno,
+                finalizados);
+
+        logger.info("✅ Asistencia procesada: Total={}, NoIniciados={}, EnTurno={}, Finalizados={}",
+                total, noIniciados.size(), enTurno.size(), finalizados.size());
+
+        return new AsistenciaResponse(hoy, resumen, detalles);
+    }
+
+    /**
+     * Obtiene el personal que el admin puede ver según su rol y ciudades
+     */
+    private List<Usuario> obtenerPersonalParaAdmin(Usuario admin, String tipoUsuario) {
+        String cargoAdmin = admin.getCargo();
+
+        // Super admin: ve TODO el personal
+        if ("ADMIN".equals(admin.getRol())) {
+            if (tipoUsuario != null && !tipoUsuario.trim().isEmpty()) {
+                return usuarioRepository.findByCargoAndRol(tipoUsuario, "USER");
+            } else {
+                return usuarioRepository.findByRol("USER");
+            }
+        }
+
+        // Obtener ciudades del admin (ya es List<String>)
+        List<String> ciudadesAdmin = admin.getCiudades();
+
+        // Admin técnico: solo ve USER_TEC
+        if ("ADMIN_TEC".equals(cargoAdmin)) {
+            return usuarioRepository.findByCargoAndRol("USER_TEC", "USER")
+                    .stream()
+                    .filter(u -> estáEnCiudades(u.getCiudades(), ciudadesAdmin))
+                    .collect(Collectors.toList());
+        }
+
+        // Admin colaborador: solo ve USER_COO
+        if ("ADMIN_COO".equals(cargoAdmin)) {
+            return usuarioRepository.findByCargoAndRol("USER_COO", "USER")
+                    .stream()
+                    .filter(u -> estáEnCiudades(u.getCiudades(), ciudadesAdmin))
+                    .collect(Collectors.toList());
+        }
+
+        return new ArrayList<>();
+    }
+
+    /**
+     * Extrae la primera ciudad de la lista
+     */
+    private String extraerPrimeraCiudad(List<String> ciudades) {
+        if (ciudades == null || ciudades.isEmpty()) {
+            return "N/A";
+        }
+        return ciudades.get(0);
+    }
+
+    /**
+     * Verifica si el usuario está en alguna de las ciudades permitidas
+     */
+    private boolean estáEnCiudades(List<String> ciudadesUsuario, List<String> ciudadesPermitidas) {
+        if (ciudadesPermitidas == null || ciudadesPermitidas.isEmpty()) {
+            return true; // Sin restricción de ciudades
+        }
+        if (ciudadesUsuario == null || ciudadesUsuario.isEmpty()) {
+            return false;
+        }
+        return ciudadesUsuario.stream()
+                .anyMatch(ciudadesPermitidas::contains);
+    }
+}
