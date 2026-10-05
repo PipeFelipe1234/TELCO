@@ -73,7 +73,8 @@ public class AsistenciaService {
                         usuario.getIdentificacion(),
                         usuario.getNombre(),
                         usuario.getCargo(),
-                        extraerPrimeraCiudad(usuario.getCiudades())));
+                        extraerPrimeraCiudad(usuario.getCiudades()),
+                        usuario.getFoto()));
             } else if (registro.getHoraSalida() == null) {
                 // En turno
                 int cantidadReportes = (int) registroReporteRepository.countByRegistro(registro);
