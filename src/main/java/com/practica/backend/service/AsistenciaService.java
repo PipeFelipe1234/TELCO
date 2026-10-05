@@ -8,7 +8,6 @@ import com.practica.backend.dto.PersonalNoIniciado;
 import com.practica.backend.dto.ResumenAsistenciaResponse;
 import com.practica.backend.entity.Registro;
 import com.practica.backend.entity.Usuario;
-import com.practica.backend.repository.RegistroReporteRepository;
 import com.practica.backend.repository.RegistroRepository;
 import com.practica.backend.repository.UsuarioRepository;
 import org.slf4j.Logger;
@@ -31,13 +30,10 @@ public class AsistenciaService {
 
     private final UsuarioRepository usuarioRepository;
     private final RegistroRepository registroRepository;
-    private final RegistroReporteRepository registroReporteRepository;
 
-    public AsistenciaService(UsuarioRepository usuarioRepository, RegistroRepository registroRepository,
-            RegistroReporteRepository registroReporteRepository) {
+    public AsistenciaService(UsuarioRepository usuarioRepository, RegistroRepository registroRepository) {
         this.usuarioRepository = usuarioRepository;
         this.registroRepository = registroRepository;
-        this.registroReporteRepository = registroReporteRepository;
     }
 
     /**
@@ -77,7 +73,6 @@ public class AsistenciaService {
                         usuario.getFoto()));
             } else if (registro.getHoraSalida() == null) {
                 // En turno
-                int cantidadReportes = (int) registroReporteRepository.countByRegistro(registro);
                 enTurno.add(new PersonalEnTurno(
                         registro.getId(),
                         usuario.getIdentificacion(),
@@ -86,10 +81,9 @@ public class AsistenciaService {
                         registro.getHoraEntrada().toString(),
                         extraerPrimeraCiudad(usuario.getCiudades()),
                         usuario.getFoto(),
-                        cantidadReportes));
+                        (int) (registro.getReportes() != null ? registro.getReportes().size() : 0)));
             } else {
                 // Turno finalizado
-                int cantidadReportes = (int) registroReporteRepository.countByRegistro(registro);
                 finalizados.add(new PersonalFinalizado(
                         registro.getId(),
                         usuario.getIdentificacion(),
@@ -99,7 +93,7 @@ public class AsistenciaService {
                         registro.getHoraSalida().toString(),
                         extraerPrimeraCiudad(usuario.getCiudades()),
                         usuario.getFoto(),
-                        cantidadReportes));
+                        (int) (registro.getReportes() != null ? registro.getReportes().size() : 0)));
             }
         }
 

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
 
 @Entity
 @Table(name = "registros")
@@ -53,6 +54,10 @@ public class Registro {
 
     // ⏱️ Minutos trabajados (total en minutos)
     private Integer minutosTrabajados;
+
+    // 📋 Relación con RegistroReporte
+    @OneToMany(mappedBy = "registro", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    private List<RegistroReporte> reportes;
 
     public Registro() {
     }
@@ -210,5 +215,13 @@ public class Registro {
 
     public void setUbicacionSalida(String ubicacionSalida) {
         this.ubicacionSalida = ubicacionSalida;
+    }
+
+    public List<RegistroReporte> getReportes() {
+        return reportes;
+    }
+
+    public void setReportes(List<RegistroReporte> reportes) {
+        this.reportes = reportes;
     }
 }
