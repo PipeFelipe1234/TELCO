@@ -13,6 +13,7 @@ import com.practica.backend.repository.UsuarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -40,6 +41,7 @@ public class AsistenciaService {
      * Obtiene el resumen de asistencia del día actual
      * Filtra por rol del admin y sus ciudades asignadas
      */
+    @Transactional(readOnly = true)
     public AsistenciaResponse obtenerAsistenciaHoy(Usuario admin, String tipoUsuario) {
         LocalDate hoy = LocalDate.now(ZONA_COLOMBIA);
         logger.info("📊 Obteniendo asistencia para el día {} - Admin: {} ({})", hoy, admin.getNombre(),

@@ -78,6 +78,19 @@ public class JwtUtil {
         }
     }
 
+    public static String extraerCargo(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody()
+                    .get("cargo", String.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
     // Extrae claims de un token incluso si está expirado
     public static Claims extraerClaimsIgnorandoExpiracion(String token) {
         try {

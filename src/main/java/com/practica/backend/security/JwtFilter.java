@@ -43,11 +43,15 @@ public class JwtFilter extends OncePerRequestFilter {
             try {
                 String identificacion = JwtUtil.extraerIdentificacion(token);
                 String rol = JwtUtil.extraerRol(token);
+                String cargo = JwtUtil.extraerCargo(token);
 
                 if (identificacion != null) {
                     List<SimpleGrantedAuthority> autoridades = new ArrayList<>();
                     if (rol != null && !rol.isEmpty()) {
                         autoridades.add(new SimpleGrantedAuthority("ROLE_" + rol));
+                    }
+                    if (cargo != null && !cargo.isEmpty()) {
+                        autoridades.add(new SimpleGrantedAuthority("ROLE_" + cargo));
                     }
 
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
