@@ -18,6 +18,8 @@ public interface RegistroReporteRepository
 
         List<RegistroReporte> findByRegistroOrderByFechaHoraAsc(Registro registro);
 
+        long countByRegistro(Registro registro);
+
         boolean existsByRegistroUsuarioIdAndFechaHora(Long usuarioId, LocalDateTime fechaHora);
 
         Optional<RegistroReporte> findTopByRegistroOrderByFechaHoraDesc(Registro registro);
