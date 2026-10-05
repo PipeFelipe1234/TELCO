@@ -53,8 +53,10 @@ public class AsistenciaService {
 
         // Obtener registros del día actual
         List<Registro> registrosHoy = registroRepository.findByFecha(hoy);
+        // Si hay múltiples registros por usuario en el mismo día, mantener el último
+        // (más reciente)
         Map<Long, Registro> registrosPorUsuario = registrosHoy.stream()
-                .collect(Collectors.toMap(r -> r.getUsuario().getId(), r -> r));
+                .collect(Collectors.toMap(r -> r.getUsuario().getId(), r -> r, (existing, next) -> next));
 
         // Clasificar personal en tres categorías
         List<PersonalNoIniciado> noIniciados = new ArrayList<>();
