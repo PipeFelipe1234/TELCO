@@ -128,7 +128,7 @@ public class AsistenciaService {
         String cargoAdmin = admin.getCargo();
 
         // Super admin: ve TODO el personal
-        if ("ADMIN".equals(admin.getRol())) {
+        if ("ADMIN".equals(cargoAdmin)) {
             if (tipoUsuario != null && !tipoUsuario.trim().isEmpty()) {
                 return usuarioRepository.findByCargoAndRol(tipoUsuario, "USER");
             } else {
