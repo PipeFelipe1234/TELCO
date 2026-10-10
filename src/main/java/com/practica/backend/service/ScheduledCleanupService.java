@@ -45,6 +45,7 @@ public class ScheduledCleanupService {
     private final RegistroReporteRepository registroReporteRepository;
     private final SolicitudUbicacionRepository solicitudRepository;
     private final NotificacionService notificacionService;
+    private final DescansoService descansoService;
     private static final Locale LOCALE_ES = new Locale("es", "ES");
 
     // Días hábiles de advertencia antes de la eliminación
@@ -54,11 +55,13 @@ public class ScheduledCleanupService {
             RegistroRepository registroRepository,
             RegistroReporteRepository registroReporteRepository,
             SolicitudUbicacionRepository solicitudRepository,
-            NotificacionService notificacionService) {
+            NotificacionService notificacionService,
+            DescansoService descansoService) {
         this.registroRepository = registroRepository;
         this.registroReporteRepository = registroReporteRepository;
         this.solicitudRepository = solicitudRepository;
         this.notificacionService = notificacionService;
+        this.descansoService = descansoService;
     }
 
     /**
@@ -92,8 +95,11 @@ public class ScheduledCleanupService {
             }
 
             registro.setHoraSalida(HORA_CIERRE_AUTOMATICO);
-            registro.setHorasTrabajadas((int) duracion.toHours());
-            registro.setMinutosTrabajados((int) duracion.toMinutes());
+            descansoService.cerrarAbiertoPorSalida(registro, fechaHoraCierre);
+            long minutosNetos = Math.max(0,
+                    duracion.toMinutes() - descansoService.minutosDescansoCerrados(registro));
+            registro.setHorasTrabajadas((int) (minutosNetos / 60));
+            registro.setMinutosTrabajados((int) minutosNetos);
             registro.setUbicacionSalida("Salida automática 23:55");
             registroRepository.save(registro);
 

@@ -52,6 +52,10 @@ public class Usuario {
     @Column(name = "tiempo_limite_minutos")
     private Integer tiempoLimiteMinutos;
 
+    // Null = límite global de 120 minutos
+    @Column(name = "tiempo_limite_almuerzo_minutos")
+    private Integer tiempoLimiteAlmuerzoMinutos;
+
     /**
      * Zonas asignadas al usuario.
      * Un usuario puede tener múltiples zonas donde puede trabajar.
@@ -165,6 +169,14 @@ public class Usuario {
 
     public void setTiempoLimiteMinutos(Integer tiempoLimiteMinutos) {
         this.tiempoLimiteMinutos = tiempoLimiteMinutos;
+    }
+
+    public Integer getTiempoLimiteAlmuerzoMinutos() {
+        return tiempoLimiteAlmuerzoMinutos;
+    }
+
+    public void setTiempoLimiteAlmuerzoMinutos(Integer tiempoLimiteAlmuerzoMinutos) {
+        this.tiempoLimiteAlmuerzoMinutos = tiempoLimiteAlmuerzoMinutos;
     }
 
     public Set<Zona> getZonasAsignadas() {

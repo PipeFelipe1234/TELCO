@@ -18,6 +18,7 @@ public record UsuarioConZonasResponse(
         String cargo,
         List<String> ciudades,
         Integer tiempoLimiteMinutos,
+        Integer tiempoLimiteAlmuerzoMinutos,
         List<ZonaSimpleResponse> zonasAsignadas) {
 
     /**
@@ -56,6 +57,7 @@ public record UsuarioConZonasResponse(
                 usuario.getCargo(),
                 usuario.getCiudades(),
                 usuario.getTiempoLimiteMinutos(),
+                usuario.getTiempoLimiteAlmuerzoMinutos(),
                 zonas);
     }
 }

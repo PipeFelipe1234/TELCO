@@ -44,6 +44,7 @@ public class RegistroService {
     private final NotificacionService notificacionService;
     private final GeocodingService geocodingService;
     private final RastreoZonaService rastreoZonaService;
+    private final DescansoService descansoService;
     private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
     private static final ZoneId ZONA_COLOMBIA = ZoneId.of("America/Bogota");
     private static final long VENTANA_DUPLICADO_MINUTOS = 5;
@@ -52,12 +53,14 @@ public class RegistroService {
     public RegistroService(RegistroRepository registroRepository,
             RegistroReporteRepository registroReporteRepository,
             NotificacionService notificacionService,
-            GeocodingService geocodingService, RastreoZonaService rastreoZonaService) {
+            GeocodingService geocodingService, RastreoZonaService rastreoZonaService,
+            DescansoService descansoService) {
         this.registroRepository = registroRepository;
         this.registroReporteRepository = registroReporteRepository;
         this.notificacionService = notificacionService;
         this.geocodingService = geocodingService;
         this.rastreoZonaService = rastreoZonaService;
+        this.descansoService = descansoService;
     }
 
     /**
@@ -190,8 +193,14 @@ public class RegistroService {
         LocalDateTime fechaHoraSalidaFinal = LocalDateTime.of(fechaSalida, horaSalida);
         Duration duracion = Duration.between(fechaHoraEntrada, fechaHoraSalidaFinal);
 
-        registro.setHorasTrabajadas((int) duracion.toHours());
-        registro.setMinutosTrabajados((int) duracion.toMinutes());
+        // Un descanso abierto se cierra con la hora de salida; el tiempo de descanso no
+        // cuenta como trabajado
+        descansoService.cerrarAbiertoPorSalida(registro, fechaHoraSalidaFinal);
+        long minutosNetos = Math.max(0,
+                duracion.toMinutes() - descansoService.minutosDescansoCerrados(registro));
+
+        registro.setHorasTrabajadas((int) (minutosNetos / 60));
+        registro.setMinutosTrabajados((int) minutosNetos);
 
         Registro guardado = registroRepository.save(registro);
 
@@ -544,25 +553,29 @@ public class RegistroService {
         Boolean enCurso = (r.getHoraSalida() == null);
         Integer horasTrabajadas;
         Integer minutosTrabajados;
+        Integer minutosDescanso;
 
         if (enCurso) {
-            // 🟢 Turno en curso - calcular horas y minutos en tiempo real
+            // 🟢 Turno en curso - el conteo se detiene mientras hay un descanso abierto
             Duration duracion = Duration.between(r.getHoraEntrada(), LocalTime.now(ZONA_COLOMBIA));
-            horasTrabajadas = (int) duracion.toHours();
-            minutosTrabajados = (int) duracion.toMinutes();
+            minutosDescanso = descansoService.minutosDescanso(r, LocalDateTime.now(ZONA_COLOMBIA));
+            long netos = Math.max(0, duracion.toMinutes() - minutosDescanso);
+            horasTrabajadas = (int) (netos / 60);
+            minutosTrabajados = (int) netos;
         } else {
+            minutosDescanso = descansoService.minutosDescansoCerrados(r);
             // 🔴 Turno finalizado - usar valor guardado o calcular
             if (r.getHorasTrabajadas() != null) {
                 horasTrabajadas = r.getHorasTrabajadas();
             } else {
                 Duration duracion = Duration.between(r.getHoraEntrada(), r.getHoraSalida());
-                horasTrabajadas = (int) duracion.toHours();
+                horasTrabajadas = (int) (Math.max(0, duracion.toMinutes() - minutosDescanso) / 60);
             }
             if (r.getMinutosTrabajados() != null) {
                 minutosTrabajados = r.getMinutosTrabajados();
             } else {
                 Duration duracion = Duration.between(r.getHoraEntrada(), r.getHoraSalida());
-                minutosTrabajados = (int) duracion.toMinutes();
+                minutosTrabajados = (int) Math.max(0, duracion.toMinutes() - minutosDescanso);
             }
         }
 
@@ -592,6 +605,7 @@ public class RegistroService {
                 r.getUsuario().getCargo(),
                 horasTrabajadas,
                 minutosTrabajados,
+                minutosDescanso,
                 enCurso,
                 r.getUbicacionEntrada(),
                 r.getUbicacionSalida(),

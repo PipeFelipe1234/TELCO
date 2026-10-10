@@ -6,6 +6,7 @@ import com.practica.backend.dto.PersonalEnTurno;
 import com.practica.backend.dto.PersonalFinalizado;
 import com.practica.backend.dto.PersonalNoIniciado;
 import com.practica.backend.dto.ResumenAsistenciaResponse;
+import com.practica.backend.entity.Descanso;
 import com.practica.backend.entity.Registro;
 import com.practica.backend.entity.Usuario;
 import com.practica.backend.repository.RegistroRepository;
@@ -15,7 +16,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -31,10 +34,13 @@ public class AsistenciaService {
 
     private final UsuarioRepository usuarioRepository;
     private final RegistroRepository registroRepository;
+    private final DescansoService descansoService;
 
-    public AsistenciaService(UsuarioRepository usuarioRepository, RegistroRepository registroRepository) {
+    public AsistenciaService(UsuarioRepository usuarioRepository, RegistroRepository registroRepository,
+            DescansoService descansoService) {
         this.usuarioRepository = usuarioRepository;
         this.registroRepository = registroRepository;
+        this.descansoService = descansoService;
     }
 
     /**
@@ -58,6 +64,10 @@ public class AsistenciaService {
         Map<Long, Registro> registrosPorUsuario = registrosHoy.stream()
                 .collect(Collectors.toMap(r -> r.getUsuario().getId(), r -> r, (existing, next) -> next));
 
+        Map<Long, List<Descanso>> descansosPorRegistro = descansoService.descansosPorRegistro(
+                registrosPorUsuario.values().stream().map(Registro::getId).toList());
+        LocalDateTime ahora = LocalDateTime.now(ZONA_COLOMBIA);
+
         // Clasificar personal en tres categorías
         List<PersonalNoIniciado> noIniciados = new ArrayList<>();
         List<PersonalEnTurno> enTurno = new ArrayList<>();
@@ -77,6 +87,11 @@ public class AsistenciaService {
                         usuario.getFoto()));
             } else if (registro.getHoraSalida() == null) {
                 // En turno
+                List<Descanso> descansos = descansosPorRegistro.getOrDefault(registro.getId(), List.of());
+                Descanso abierto = descansos.stream().filter(d -> d.getHoraFin() == null).findFirst().orElse(null);
+                boolean excedido = abierto != null && (abierto.getExcedioTiempoLimite()
+                        || Duration.between(abierto.getHoraInicio(), ahora).toMinutes() > descansoService
+                                .limiteMinutos(usuario));
                 enTurno.add(new PersonalEnTurno(
                         registro.getId(),
                         usuario.getIdentificacion(),
@@ -85,7 +100,11 @@ public class AsistenciaService {
                         registro.getHoraEntrada().toString(),
                         extraerPrimeraCiudad(usuario.getCiudades()),
                         usuario.getFoto(),
-                        (int) (registro.getReportes() != null ? registro.getReportes().size() : 0)));
+                        (int) (registro.getReportes() != null ? registro.getReportes().size() : 0),
+                        abierto != null,
+                        abierto != null ? DescansoService.aIso(abierto.getHoraInicio()) : null,
+                        excedido,
+                        descansos.size()));
             } else {
                 // Turno finalizado
                 finalizados.add(new PersonalFinalizado(
@@ -97,7 +116,11 @@ public class AsistenciaService {
                         registro.getHoraSalida().toString(),
                         extraerPrimeraCiudad(usuario.getCiudades()),
                         usuario.getFoto(),
-                        (int) (registro.getReportes() != null ? registro.getReportes().size() : 0)));
+                        (int) (registro.getReportes() != null ? registro.getReportes().size() : 0),
+                        false,
+                        null,
+                        false,
+                        descansosPorRegistro.getOrDefault(registro.getId(), List.of()).size()));
             }
         }
 

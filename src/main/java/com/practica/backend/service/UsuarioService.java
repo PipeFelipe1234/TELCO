@@ -41,7 +41,8 @@ public class UsuarioService {
                                 u.getTelefono(),
                                 u.getCargo(),
                                 u.getCiudades(),
-                                u.getTiempoLimiteMinutos());
+                                u.getTiempoLimiteMinutos(),
+                                u.getTiempoLimiteAlmuerzoMinutos());
         }
 
         public UsuarioResponse crearUsuario(UsuarioRequest request) {
@@ -60,6 +61,7 @@ public class UsuarioService {
                 usuario.setCargo(request.cargo());
                 usuario.setCiudades(request.ciudades());
                 usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
+                usuario.setTiempoLimiteAlmuerzoMinutos(request.tiempoLimiteAlmuerzoMinutos());
 
                 Usuario guardado = usuarioRepository.save(usuario);
 
@@ -79,6 +81,7 @@ public class UsuarioService {
                 usuario.setCargo(request.cargo());
                 usuario.setCiudades(request.ciudades());
                 usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
+                usuario.setTiempoLimiteAlmuerzoMinutos(request.tiempoLimiteAlmuerzoMinutos());
 
                 Usuario actualizado = usuarioRepository.save(usuario);
 
@@ -119,6 +122,7 @@ public class UsuarioService {
                 usuario.setCargo(request.cargo());
                 usuario.setCiudades(request.ciudades());
                 usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
+                usuario.setTiempoLimiteAlmuerzoMinutos(request.tiempoLimiteAlmuerzoMinutos());
 
                 Usuario actualizado = usuarioRepository.save(usuario);
 
@@ -215,6 +219,9 @@ public class UsuarioService {
                 }
                 if (request.tiempoLimiteMinutos() != null) {
                         usuario.setTiempoLimiteMinutos(request.tiempoLimiteMinutos());
+                }
+                if (request.tiempoLimiteAlmuerzoMinutos() != null) {
+                        usuario.setTiempoLimiteAlmuerzoMinutos(request.tiempoLimiteAlmuerzoMinutos());
                 }
 
                 Usuario actualizado = usuarioRepository.save(usuario);
